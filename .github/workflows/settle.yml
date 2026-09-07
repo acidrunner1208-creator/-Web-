@@ -11,6 +11,9 @@ concurrency:
   group: site
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   settle:
     runs-on: ubuntu-latest
@@ -33,14 +36,6 @@ jobs:
           USER_AGENT: ${{ secrets.USER_AGENT }}
           REQUEST_DELAY_SECONDS: "2.5"
         run: python -m builder.settle
-      - name: Commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/data/ledger.json builder/model/state
-          git commit -m "settle: results + model update $(date -u +%FT%TZ)" || echo "no changes"
-          git pull --rebase --autostash || true
-          git push
       - name: Rebuild site with updated ledger
         env:
           USER_AGENT: ${{ secrets.USER_AGENT }}
@@ -52,3 +47,12 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy public --project-name=keiba-simulator --branch=main --commit-dirty=true
+      - name: Commit results + model state
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public builder/model/state
+          git commit -m "settle: results + model update $(date -u +%FT%TZ)" || echo "no changes"
+          git pull --rebase --autostash || true
+          git push

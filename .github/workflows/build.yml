@@ -20,6 +20,9 @@ concurrency:
   group: site
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -46,7 +49,14 @@ jobs:
           [ -n "${{ github.event.inputs.dates }}" ] && ARGS="$ARGS --dates ${{ github.event.inputs.dates }}"
           [ -n "${{ github.event.inputs.limit }}" ] && ARGS="$ARGS --limit ${{ github.event.inputs.limit }}"
           python -m builder.build_site $ARGS
-      - name: Commit
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public --project-name=keiba-simulator --branch=main --commit-dirty=true
+      - name: Commit generated site (best effort)
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -54,9 +64,3 @@ jobs:
           git commit -m "site: rebuild $(date -u +%FT%TZ)" || echo "no changes"
           git pull --rebase --autostash || true
           git push
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy public --project-name=keiba-simulator --branch=main --commit-dirty=true
