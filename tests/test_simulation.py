@@ -31,6 +31,16 @@ def test_simulate_probabilities():
     assert res["horses"][0]["fair_win_odds"] > 1.0
     assert len(res["podium"]) == 3 * res["podium_n"]
 
+    # 表示する数値の整合性: 各馬 勝率 <= 連対率 <= 複勝率、適正オッズ = 1/確率
+    for h in res["horses"]:
+        assert h["win_prob"] <= h["top2_prob"] + 1e-9 <= h["place_prob"] + 2e-9
+        if h["win_prob"] > 0.01:
+            assert abs(h["fair_win_odds"] * h["win_prob"] - 1.0) < 0.05   # 適正オッズ ≒ 1/勝率
+    assert abs(sum(h["top2_prob"] for h in res["horses"]) - 2.0) < 0.05
+    # はっきり度は勝率・複勝率とは別物の段階ラベル
+    assert res["confidence_tier"] in ("高", "中", "低")
+    assert 0.0 <= res["confidence"] <= 1.0
+
 
 def test_recommended_bets_and_checker_data():
     race = demo_race_card("202605010107")

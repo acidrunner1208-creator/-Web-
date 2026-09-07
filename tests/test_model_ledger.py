@@ -1,8 +1,37 @@
 import numpy as np
 
+import builder.render as render
 from builder.model.features import D
 from builder.model.model import RankModel
+from builder.render import roi_headline
 from builder.settle import _settle_bet
+
+
+def _entry(date, stake, ret):
+    return {"date": date, "stake": stake, "ret": ret, "profit": ret - stake}
+
+
+def test_roi_headline_empty():
+    h = roi_headline({"entries": []})
+    assert h["races"] == 0 and h["profit"] == 0 and h["profit_rate"] == 0.0
+    assert h["chart"] == ""
+
+
+def test_roi_headline_computes_rate_and_filters_by_launch(monkeypatch):
+    monkeypatch.setattr(render, "LAUNCH_DATE", "2026-09-08")
+    ledger = {"entries": [
+        _entry("2026-09-01", 1000, 5000),   # 運用開始前 → 無視
+        _entry("2026-09-13", 1000, 1500),   # +500
+        _entry("2026-09-14", 1000, 0),      # -1000
+    ]}
+    h = roi_headline(ledger)
+    assert h["races"] == 2
+    assert h["stake"] == 2000 and h["ret"] == 1500
+    assert h["profit"] == -500
+    assert h["profit_rate"] == -25.0          # -500 / 2000
+    assert h["recovery_rate"] == 75.0
+    assert h["hit_races"] == 1
+    assert len(h["series"]) == 3 and h["series"][0] == 0.0
 
 
 def _fake_race(seed=0):

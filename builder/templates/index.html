@@ -5,17 +5,35 @@
 <h1>レース予測</h1>
 <p class="muted">対象: {{ meta.dates | join(" / ") }} ／ 予測済み {{ total_races }} レース</p>
 
-{% if ledger and ledger.entries %}
 <section class="card roi">
-  <h2>推奨買い目の成績（100円均等・配当実績）</h2>
-  <div class="roi-summary">
-    <div><span>回収率</span>{{ (ledger.summary.roi * 100) | round(1) }}%</div>
-    <div><span>収支</span><b class="{{ 'pos' if ledger.summary.profit >= 0 else 'neg' }}">{{ ledger.summary.profit | yen }}円</b></div>
-    <div><span>購入額</span>{{ ledger.summary.stake | yen }}円</div>
-    <div><span>払戻</span>{{ ledger.summary.ret | yen }}円</div>
-    <div><span>対象</span>{{ ledger.summary.races }}R（的中 {{ ledger.summary.hit_races }}R）</div>
+  <h2>推奨買い目の成績</h2>
+  <p class="muted">
+    アプリが推奨した「単勝」「3連複フォーメーション」「3連複 軸1頭ながし」を、
+    毎レース 1 点 100 円ずつ購入したと仮定した実績（運用開始 {{ roi.since }} 以降）。
+  </p>
+  <div class="roi-headline">
+    <div class="roi-big">
+      <span>累計利益率</span>
+      <b class="{{ 'pos' if roi.profit_rate >= 0 else 'neg' }}">{{ '%+.1f' | format(roi.profit_rate) }}%</b>
+    </div>
+    <div class="roi-big">
+      <span>累計利益額</span>
+      <b class="{{ 'pos' if roi.profit >= 0 else 'neg' }}">{{ '%+d' | format(roi.profit) }}円</b>
+    </div>
+    <div class="roi-sub">
+      <div><span>回収率</span>{{ roi.recovery_rate }}%</div>
+      <div><span>購入額</span>{{ roi.stake | yen }}円</div>
+      <div><span>払戻</span>{{ roi.ret | yen }}円</div>
+      <div><span>対象</span>{{ roi.races }}R（的中 {{ roi.hit_races }}R）</div>
+    </div>
   </div>
-  {{ roi_chart | safe }}
+  {% if roi.races >= 1 %}
+    <h3>累計利益率の推移</h3>
+    {{ roi.chart | safe }}
+  {% else %}
+    <p class="muted">まだ結果の出たレースがありません。レースが終わるたびに自動で集計・グラフ化されます。</p>
+  {% endif %}
+  {% if ledger and ledger.entries %}
   <details class="ledger-detail">
     <summary>レース別の履歴</summary>
     <div class="table-scroll">
@@ -38,8 +56,8 @@
     </table>
     </div>
   </details>
+  {% endif %}
 </section>
-{% endif %}
 
 {% if total_races == 0 %}
   <div class="card"><p>まだ予測データがありません。データ生成バッチの実行をお待ちください。</p></div>
@@ -47,7 +65,10 @@
 
 <section class="attention">
   <h2>★ 注目レース TOP3</h2>
-  <p class="muted">シミュレーション上、軸となる馬がはっきりしているレース。</p>
+  <p class="muted">
+    シミュレーション上、軸となる馬がはっきりしているレース（本命の勝率と2番手との勝率差から判定）。
+    「はっきり度」は 高／中／低 の目安で、勝率・複勝率とは別の指標です。
+  </p>
   <div class="attention-grid">
     {% for r in attention %}
     {% set top = r.horses[0] %}
@@ -59,7 +80,7 @@
         <tr><th>軸</th><td>{{ top.num }}. {{ top.name }}</td></tr>
         <tr><th>推定勝率</th><td>{{ top.win_prob | pct }}（適正{{ top.fair_win_odds }}倍）</td></tr>
         <tr><th>複勝率</th><td>{{ top.place_prob | pct }}</td></tr>
-        <tr><th>信頼度</th><td>{{ (r.confidence * 100) | round(0) }}%</td></tr>
+        <tr><th>はっきり度</th><td>{{ r.confidence_tier }}</td></tr>
       </table>
     </a>
     {% endfor %}
@@ -72,7 +93,7 @@
   <div class="table-scroll">
   <table class="race-table">
     <thead>
-      <tr><th>R</th><th>レース</th><th>コース</th><th>発走</th><th>本命</th><th>勝率</th><th>適正</th><th>信頼度</th></tr>
+      <tr><th>R</th><th>レース</th><th>コース</th><th>発走</th><th>本命</th><th>勝率</th><th>適正</th><th>はっきり度</th></tr>
     </thead>
     <tbody>
       {% for r in g.races %}
@@ -85,7 +106,7 @@
         <td>{{ top.num }}. {{ top.name }}</td>
         <td><b>{{ top.win_prob | pct }}</b></td>
         <td>{{ top.fair_win_odds }}倍</td>
-        <td>{{ (r.confidence * 100) | round(0) }}%</td>
+        <td>{{ r.confidence_tier }}</td>
       </tr>
       {% endfor %}
     </tbody>

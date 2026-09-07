@@ -89,7 +89,10 @@ def simulate(race: Race, n_sims: int = 10000, seed: int = 12345,
 
     order_by_win = list(np.argsort(-win))
     ws = win[order_by_win]
+    # 「軸がはっきりしているか」の指標 (0..1): 1番手の勝率 と 1↔2番手の勝率差 の合成。
+    # 確率そのものではなく "抜けの大きさ" なので、表示は数値ではなく段階ラベルにする。
     confidence = float(np.clip(0.58 * ws[0] + 0.42 * (ws[0] - ws[1]), 0, 1))
+    conf_tier = "高" if confidence >= 0.30 else ("中" if confidence >= 0.16 else "低")
 
     def fair(p: float) -> float:
         return round(1.0 / p, 1) if p > 1e-4 else 999.9
@@ -137,6 +140,7 @@ def simulate(race: Race, n_sims: int = 10000, seed: int = 12345,
         "model": ("学習モデル" if _MODEL is not None else "ベースライン"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "confidence": round(confidence, 3),
+        "confidence_tier": conf_tier,
         "pace": pace_label,
         "pace_press": round(pace_press, 2),
         "horses": horses,

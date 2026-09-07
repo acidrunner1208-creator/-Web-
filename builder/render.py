@@ -126,13 +126,18 @@ def positions_chart_svg(animation: dict | None, width: int = 760, height: int = 
     return "".join(parts)
 
 
-def line_chart_svg(points: list[float], width: int = 640, height: int = 220) -> str:
-    """累積損益の折れ線 (0 基準線つき)。"""
+def line_chart_svg(points: list[float], width: int = 640, height: int = 220,
+                   mode: str = "yen") -> str:
+    """0 基準線つきの折れ線。mode="yen" は円、"pct" は利益率(%) 表示。"""
     if len(points) < 2:
         return '<p class="muted">まだ確定した結果がありません。</p>'
+
+    def lab(v: float) -> str:
+        return f"{v:+.1f}%" if mode == "pct" else f"￥{int(v):,}"
+
     lo, hi = min(points + [0.0]), max(points + [0.0])
     span = (hi - lo) or 1.0
-    pad = 24
+    pad = 30
     xs = [pad + i / (len(points) - 1) * (width - 2 * pad) for i in range(len(points))]
     ys = [height - pad - (p - lo) / span * (height - 2 * pad) for p in points]
     zero_y = height - pad - (0 - lo) / span * (height - 2 * pad)
@@ -142,15 +147,48 @@ def line_chart_svg(points: list[float], width: int = 640, height: int = 220) -> 
         f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys)
     ) + f" L {xs[-1]:.1f},{zero_y:.1f} Z"
     return (
-        f'<svg viewBox="0 0 {width} {height}" class="roi-chart" role="img" aria-label="累積損益">'
+        f'<svg viewBox="0 0 {width} {height}" class="roi-chart" role="img" '
+        f'aria-label="{"累積利益率" if mode == "pct" else "累積損益"}">'
         f'<path d="{area}" fill="{last_col}" fill-opacity="0.12"/>'
         f'<line x1="{pad}" y1="{zero_y:.1f}" x2="{width - pad}" y2="{zero_y:.1f}" '
         f'stroke="#999" stroke-dasharray="3 3"/>'
+        f'<text x="{width - pad}" y="{zero_y - 4:.1f}" font-size="10" fill="#999" text-anchor="end">±0</text>'
         f'<path d="{path}" fill="none" stroke="{last_col}" stroke-width="2"/>'
-        f'<text x="{pad}" y="14" font-size="11" fill="#666">￥{int(hi):,}</text>'
-        f'<text x="{pad}" y="{height - 6}" font-size="11" fill="#666">￥{int(lo):,}</text>'
+        f'<text x="4" y="14" font-size="11" fill="#666">{lab(hi)}</text>'
+        f'<text x="4" y="{height - 6}" font-size="11" fill="#666">{lab(lo)}</text>'
         f'</svg>'
     )
+
+
+LAUNCH_DATE = "2026-09-08"   # この日以降のレースを「運用開始からの成績」として集計
+
+
+def roi_headline(ledger: dict) -> dict:
+    """運用開始日以降の累計成績。空でも 0 を返す (ホームに常時表示するため)。"""
+    entries = [e for e in ledger.get("entries", []) if e.get("date", "") >= LAUNCH_DATE]
+    stake = sum(e["stake"] for e in entries)
+    ret = sum(e["ret"] for e in entries)
+    hit = sum(1 for e in entries if e["profit"] > 0)
+    rate = (ret - stake) / stake * 100 if stake else 0.0
+    # 累積利益率(%) の推移
+    cs = cr = 0
+    series = [0.0]
+    for e in entries:
+        cs += e["stake"]
+        cr += e["ret"]
+        series.append((cr - cs) / cs * 100 if cs else 0.0)
+    return {
+        "since": LAUNCH_DATE,
+        "races": len(entries),
+        "hit_races": hit,
+        "stake": stake,
+        "ret": ret,
+        "profit": ret - stake,
+        "profit_rate": round(rate, 1),
+        "recovery_rate": round(ret / stake * 100, 1) if stake else 0.0,
+        "series": series,
+        "chart": line_chart_svg(series, mode="pct") if len(series) >= 2 else "",
+    }
 
 
 env.filters["pct"] = _pct
@@ -212,11 +250,12 @@ def render_site(out_dir: Path, payload: dict) -> None:
             ledger = {}
     cum = [e["cum_profit"] for e in ledger.get("entries", [])]
     roi_chart = line_chart_svg([0.0] + cum) if cum else ""
+    roi = roi_headline(ledger)
 
     (out_dir / "index.html").write_text(
         env.get_template("index.html").render(
             meta=meta, attention=payload["attention"], groups=payload["groups"],
-            total_races=len(races), ledger=ledger, roi_chart=roi_chart,
+            total_races=len(races), ledger=ledger, roi_chart=roi_chart, roi=roi,
         ),
         encoding="utf-8",
     )
