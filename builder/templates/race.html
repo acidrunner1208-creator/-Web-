@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}{{ r.venue }}{{ r.race_number }}R {{ r.race_name }} — 予測{% endblock %}
+{% set pace_ja = {"H": "ハイペース想定", "M": "平均ペース想定", "S": "スローペース想定"} %}
+{% block content %}
+
+<p><a href="/">← レース一覧</a></p>
+<h1>{{ r.venue }}{{ r.race_number }}R　{{ r.race_name }}</h1>
+
+<section class="card">
+  <h2>一次情報</h2>
+  <div class="info-grid">
+    <div><span>日付</span>{{ r.kaisai_date }}</div>
+    <div><span>発走</span>{{ r.start_time or "—" }}</div>
+    <div><span>コース</span>{{ r.surface }}{{ r.distance }}m {{ r.direction or "" }}（{{ r.venue }}）</div>
+    <div><span>クラス</span>{{ r.race_class or "—" }}</div>
+    <div><span>天候</span>{{ r.weather or "—" }}</div>
+    <div><span>馬場</span>{{ r.track_condition or "—" }}</div>
+    <div><span>頭数</span>{{ r.field_size or (r.horses | length) }}</div>
+    <div><span>展開想定</span>{{ pace_ja[r.pace] }}</div>
+    <div><span>軸の信頼度</span>{{ (r.confidence * 100) | round(0) }}%</div>
+  </div>
+  {% if not r.weather or not r.track_condition %}
+  <p class="muted">※ 天候・馬場は当日発表。枠順・馬体重も確定前は空欄になります。予想は毎日更新し、レース当日の馬場発表後に再更新します。</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>レース展開シミュレーション</h2>
+  <p class="muted">{{ r.animation.pace_note }}</p>
+  <div class="anim-wrap">
+    <canvas id="raceCanvas" width="900" height="460" aria-label="レース展開アニメーション"></canvas>
+    <div class="anim-controls">
+      <button id="animPlay" type="button">▶ 再生</button>
+      <button id="animReplay" type="button">↻ 最初から</button>
+      <input id="animScrub" type="range" min="0" max="100" value="0" aria-label="再生位置">
+      <span id="animLabel" class="muted">残り {{ r.distance }}m</span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ r.n_sims }}回シミュレーション結果</h2>
+  <div class="table-scroll">
+  <table class="pred-table">
+    <thead>
+      <tr>
+        <th>予</th><th>馬番</th><th>馬名</th><th>脚質</th><th>騎手</th>
+        <th>勝率</th><th>適正<br>オッズ</th><th>連対率</th><th>複勝率</th><th>平均<br>着順</th><th>着順分布</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in r.horses %}
+      <tr class="{{ 'top-pick' if h.rank == 1 }}">
+        <td>{{ h.rank }}</td>
+        <td>{{ h.num }}</td>
+        <td class="hname">
+          {% if h.netkeiba_url %}
+          <a href="{{ h.netkeiba_url }}" target="_blank" rel="noopener noreferrer">{{ h.name }}</a>
+          {% else %}{{ h.name }}{% endif %}
+          {% if h.sex_age %}<small class="muted"> {{ h.sex_age }}{% if h.weight_carried %} 斤{{ h.weight_carried }}{% endif %}</small>{% endif %}
+          {% for n in h.notes %}<span class="note-chip">{{ n }}</span>{% endfor %}
+        </td>
+        <td>{{ h.style }}</td>
+        <td>{{ h.jockey or "—" }}</td>
+        <td><b>{{ h.win_prob | pct }}</b></td>
+        <td>{{ h.fair_win_odds }}倍</td>
+        <td>{{ h.top2_prob | pct }}</td>
+        <td>{{ h.place_prob | pct }}</td>
+        <td>{{ h.avg_finish }}</td>
+        <td>{{ bars_svg(h.finish_dist) | safe }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">「適正オッズ」＝ 1 ÷ 推定確率。実オッズがこれより高ければ期待値プラスの目安。</p>
+</section>
+
+<section class="card">
+  <h2>推奨買い目</h2>
+  <p class="muted">
+    {{ r.n_sims }}回シミュレーション上の推定的中率です。実オッズ欄に netkeiba で見た配当（100円あたり）を
+    入力すると期待値（＝的中率 × 配当 ÷ 100 − 1）を計算します。
+  </p>
+  <div class="table-scroll">
+  <table class="bet-table" id="recTable">
+    <thead><tr><th>買い方</th><th>買い目</th><th>点数</th><th>推定的中率</th><th>適正オッズ</th><th>実オッズ(100円)</th><th>期待値</th></tr></thead>
+    <tbody>
+      {% for b in r.recommended %}
+      <tr data-prob="{{ b.hit_prob }}" data-unit="{{ b.unit }}">
+        <td class="bt">{{ b.type }}{% if b.tracked %} <span class="track-badge">成績集計対象</span>{% endif %}</td>
+        <td>{{ b.selection }}<br><small class="muted">{{ b.note }}</small></td>
+        <td>{{ b.unit }}点</td>
+        <td><b>{{ b.hit_prob | pct }}</b></td>
+        <td>{{ b.fair_odds }}倍</td>
+        <td><input type="number" step="0.1" min="1" class="odds-in" placeholder="—"></td>
+        <td class="ev muted">—</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>買い目チェッカー（オッズ公開後）</h2>
+  <p class="muted">
+    買いたい馬番にチェックを入れ、買い方を選ぶと、その買い目の推定的中率を計算します
+    （{{ r.podium_n }}回のシミュレーション着順サンプルに基づく）。netkeiba でオッズを見て実オッズを入れると期待値も出ます。
+  </p>
+  <div id="betChecker">
+    <div class="bc-row">
+      <label>買い方
+        <select id="bcType">
+          <option value="tansho">単勝</option>
+          <option value="fukusho">複勝</option>
+          <option value="umaren">馬連</option>
+          <option value="wide">ワイド</option>
+          <option value="umatan">馬単</option>
+          <option value="sanrenpuku">3連複（ボックス）</option>
+          <option value="sanrenpuku_nagashi">3連複 軸1頭ながし</option>
+          <option value="sanrentan">3連単（1着→2着→3着 指定）</option>
+        </select>
+      </label>
+      <span id="bcHint" class="muted"></span>
+    </div>
+    <div id="bcHorses" class="bc-horses"></div>
+    <div class="bc-row">
+      <span>推定的中率: <b id="bcProb">—</b></span>
+      <span>点数: <b id="bcPoints">—</b></span>
+      <label>実オッズ(100円): <input type="number" step="0.1" min="1" id="bcOdds" class="odds-in"></label>
+      <span>期待値: <b id="bcEV" class="muted">—</b></span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>各馬の過去戦績（要約）</h2>
+  <p class="muted">直近6走の要約です。全戦績・詳細は馬名または「netkeibaで見る」から。</p>
+  {% for h in r.horses %}
+  <details class="horse-past">
+    <summary>
+      {{ h.num }}. {{ h.name }}
+      <span class="muted">［{{ h.starts }}戦{{ h.wins }}勝・3着内{{ h.top3 }}／{{ h.style }}{% if h.best_last3f %}・上がり最速{{ h.best_last3f }}{% endif %}］</span>
+      {% if h.netkeiba_url %}<a href="{{ h.netkeiba_url }}" target="_blank" rel="noopener noreferrer">netkeibaで見る ↗</a>{% endif %}
+    </summary>
+    <div class="table-scroll">
+    <table class="past-table">
+      <thead><tr>
+        <th>日付</th><th>開催</th><th>レース</th><th>頭</th><th>人気</th><th>着</th>
+        <th>距離</th><th>馬場</th><th>タイム</th><th>通過</th><th>ペース</th><th>上り</th><th>馬体重</th>
+      </tr></thead>
+      <tbody>
+        {% for p in h.past %}
+        <tr>
+          <td>{{ p.date }}</td><td>{{ p.venue or "" }}</td><td>{{ p.race_name or "" }}</td>
+          <td>{{ p.field_size or "" }}</td><td>{{ p.popularity or "" }}</td>
+          <td class="{{ 'win' if p.finish_pos == 1 }}">{{ p.finish_pos or "" }}</td>
+          <td>{{ p.surface or "" }}{{ p.distance or "" }}</td><td>{{ p.track_condition or "" }}</td>
+          <td>{{ p.time_sec or "" }}</td><td>{{ p.passing or "" }}</td>
+          <td>{{ p.pace or "" }}</td><td>{{ p.last_3f or "" }}</td>
+          <td>{{ p.body_weight or "" }}{% if p.body_weight_diff is not none %}({{ p.body_weight_diff }}){% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+  {% endfor %}
+</section>
+
+<script>
+window.__RACE_ANIM__ = {{ r.animation | tojson }};
+window.__RACE__ = {{ {"horses": r.horses | map(attribute="num") | list, "names": r.horses | map(attribute="name") | list, "podium": r.podium, "podium_n": r.podium_n} | tojson }};
+</script>
+<script src="/assets/race-anim.js"></script>
+<script src="/assets/bet-check.js"></script>
+{% endblock %}

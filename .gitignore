@@ -1,0 +1,29 @@
+# scrape cache / local artifacts
+.cache/
+*.log
+
+# 生成物 (public/index.html, public/races/, public/data/ 等) は
+# GitHub Actions がコミットしてデプロイ経路になるため、あえて追跡する。
+# public/assets/ はソース。
+
+# env
+.env
+.venv/
+venv/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node (wrangler)
+node_modules/
+.wrangler/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

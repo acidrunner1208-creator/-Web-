@@ -1,0 +1,8 @@
+# Cloudflare Pages 設定
+name = "keiba-simulator"
+pages_build_output_dir = "public"
+compatibility_date = "2024-11-01"
+
+# 環境変数 (APP_USERNAME / APP_PASSWORD / USER_AGENT) は
+# Cloudflare ダッシュボード → Pages → Settings → Environment variables で設定してください。
+# ローカルプレビュー: npx wrangler pages dev public

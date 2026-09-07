@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}レース予測 — 競馬シミュレーター{% endblock %}
+{% block content %}
+
+<h1>レース予測</h1>
+<p class="muted">対象: {{ meta.dates | join(" / ") }} ／ 予測済み {{ total_races }} レース</p>
+
+{% if ledger and ledger.entries %}
+<section class="card roi">
+  <h2>推奨買い目の成績（100円均等・配当実績）</h2>
+  <div class="roi-summary">
+    <div><span>回収率</span>{{ (ledger.summary.roi * 100) | round(1) }}%</div>
+    <div><span>収支</span><b class="{{ 'pos' if ledger.summary.profit >= 0 else 'neg' }}">{{ ledger.summary.profit | yen }}円</b></div>
+    <div><span>購入額</span>{{ ledger.summary.stake | yen }}円</div>
+    <div><span>払戻</span>{{ ledger.summary.ret | yen }}円</div>
+    <div><span>対象</span>{{ ledger.summary.races }}R（的中 {{ ledger.summary.hit_races }}R）</div>
+  </div>
+  {{ roi_chart | safe }}
+  <details class="ledger-detail">
+    <summary>レース別の履歴</summary>
+    <div class="table-scroll">
+    <table class="ledger-table">
+      <thead><tr><th>日付</th><th>レース</th><th>購入</th><th>払戻</th><th>収支</th><th>累計</th></tr></thead>
+      <tbody>
+        {% for e in ledger.entries | reverse %}
+        <tr>
+          <td>{{ e.date }}</td>
+          <td class="rname">{{ e.venue }}{{ e.race_number }}R {{ e.name }}
+            <small class="muted">{% for b in e.bets %}{{ b.type }}{{ "○" if b.hit else "×" }} {% endfor %}</small>
+          </td>
+          <td>{{ e.stake | yen }}</td>
+          <td>{{ e.ret | yen }}</td>
+          <td class="{{ 'pos' if e.profit >= 0 else 'neg' }}">{{ e.profit | yen }}</td>
+          <td class="{{ 'pos' if e.cum_profit >= 0 else 'neg' }}">{{ e.cum_profit | yen }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+</section>
+{% endif %}
+
+{% if total_races == 0 %}
+  <div class="card"><p>まだ予測データがありません。データ生成バッチの実行をお待ちください。</p></div>
+{% else %}
+
+<section class="attention">
+  <h2>★ 注目レース TOP3</h2>
+  <p class="muted">シミュレーション上、軸となる馬がはっきりしているレース。</p>
+  <div class="attention-grid">
+    {% for r in attention %}
+    {% set top = r.horses[0] %}
+    <a class="pick-card rank-{{ loop.index }}" href="/races/{{ r.race_id }}.html">
+      <div class="pick-rank">No.{{ loop.index }}</div>
+      <div class="pick-title">{{ r.venue }}{{ r.race_number }}R {{ r.race_name }}</div>
+      <div class="pick-meta">{{ r.kaisai_date }} ／ {{ r.surface }}{{ r.distance }}m ／ {{ r.start_time or "" }}</div>
+      <table class="pick-stats">
+        <tr><th>軸</th><td>{{ top.num }}. {{ top.name }}</td></tr>
+        <tr><th>推定勝率</th><td>{{ top.win_prob | pct }}（適正{{ top.fair_win_odds }}倍）</td></tr>
+        <tr><th>複勝率</th><td>{{ top.place_prob | pct }}</td></tr>
+        <tr><th>信頼度</th><td>{{ (r.confidence * 100) | round(0) }}%</td></tr>
+      </table>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+{% for g in groups %}
+<section class="venue-block">
+  <h3>{{ g.date }} — {{ g.venue }}</h3>
+  <div class="table-scroll">
+  <table class="race-table">
+    <thead>
+      <tr><th>R</th><th>レース</th><th>コース</th><th>発走</th><th>本命</th><th>勝率</th><th>適正</th><th>信頼度</th></tr>
+    </thead>
+    <tbody>
+      {% for r in g.races %}
+      {% set top = r.horses[0] %}
+      <tr onclick="location.href='/races/{{ r.race_id }}.html'">
+        <td>{{ r.race_number }}</td>
+        <td class="rname">{{ r.race_name }}</td>
+        <td>{{ r.surface }}{{ r.distance }}m</td>
+        <td>{{ r.start_time or "—" }}</td>
+        <td>{{ top.num }}. {{ top.name }}</td>
+        <td><b>{{ top.win_prob | pct }}</b></td>
+        <td>{{ top.fair_win_odds }}倍</td>
+        <td>{{ (r.confidence * 100) | round(0) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endfor %}
+
+{% endif %}
+{% endblock %}

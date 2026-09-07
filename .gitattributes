@@ -1,0 +1,6 @@
+# GitHub Actions (Linux) で動くので改行は LF に統一
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.npz binary
+*.ps1 text eol=crlf

@@ -1,0 +1,56 @@
+name: build-site
+
+on:
+  schedule:
+    - cron: "30 9 * * *"     # 毎日 18:30 JST — 出走馬/枠順/騎手/追切の確定を反映
+    - cron: "0 22 * * 5"     # 土 07:00 JST — レース当日の朝
+    - cron: "30 23 * * 5"    # 土 08:30 JST — 馬場発表後
+    - cron: "0 22 * * 6"     # 日 07:00 JST
+    - cron: "30 23 * * 6"    # 日 08:30 JST
+  workflow_dispatch:
+    inputs:
+      dates:
+        description: "対象日 YYYYMMDD (スペース区切り、空欄で今日〜9日先)"
+        required: false
+      limit:
+        description: "レース数の上限 (試験用)"
+        required: false
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Restore scrape cache
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: scrape-cache-${{ github.run_id }}
+          restore-keys: scrape-cache-
+      - name: Build
+        env:
+          USER_AGENT: ${{ secrets.USER_AGENT }}
+          REQUEST_DELAY_SECONDS: "2.5"
+        run: |
+          ARGS=""
+          [ -n "${{ github.event.inputs.dates }}" ] && ARGS="$ARGS --dates ${{ github.event.inputs.dates }}"
+          [ -n "${{ github.event.inputs.limit }}" ] && ARGS="$ARGS --limit ${{ github.event.inputs.limit }}"
+          python -m builder.build_site $ARGS
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public
+          git commit -m "site: rebuild $(date -u +%FT%TZ)" || echo "no changes"
+          git pull --rebase --autostash || true
+          git push

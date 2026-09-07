@@ -1,0 +1,93 @@
+:root{
+  --bg:#f4f5f7;--card:#fff;--ink:#1f2733;--muted:#6b7684;--line:#e2e5ea;
+  --accent:#3f6fb0;--pick:#d64545;--win:#1f8a4c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;line-height:1.6}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.site-header{background:#1f2733;color:#fff}
+.site-header .wrap{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px}
+.site-header .brand{color:#fff;font-weight:700}
+.site-header nav{display:flex;gap:14px}
+.site-header nav a{color:#cdd6e0}
+
+.banner{padding:8px 16px;text-align:center;font-size:.9rem}
+.banner.demo{background:#fff3cd;color:#7a5b00}
+
+h1{font-size:1.45rem;margin:20px 0 4px}
+h2{font-size:1.12rem;margin:0 0 12px}
+h3{font-size:1.02rem;margin:22px 0 8px;border-left:4px solid var(--accent);padding-left:8px}
+.muted{color:var(--muted);font-size:.86rem}
+b.pos,.pos{color:var(--win)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:16px 0}
+
+.attention h2{color:var(--pick)}
+.attention-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px}
+.pick-card{display:block;background:#fff;border:2px solid var(--line);border-radius:12px;padding:14px;color:var(--ink)}
+.pick-card:hover{text-decoration:none;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.pick-card.rank-1{border-color:var(--pick)}
+.pick-card.rank-2{border-color:#e08a2e}
+.pick-card.rank-3{border-color:#b8b23a}
+.pick-rank{font-weight:700;color:var(--pick);font-size:.82rem}
+.pick-title{font-weight:700;margin:4px 0}
+.pick-meta{font-size:.8rem;color:var(--muted);margin-bottom:8px}
+.pick-stats{width:100%;font-size:.88rem;border-collapse:collapse}
+.pick-stats th{text-align:left;color:var(--muted);font-weight:500;width:42%;padding:2px 0}
+
+.table-scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.87rem}
+.race-table th,.race-table td,.pred-table th,.pred-table td,.past-table th,.past-table td,.bet-table th,.bet-table td{
+  border-bottom:1px solid var(--line);padding:6px 8px;text-align:center;white-space:nowrap}
+.race-table tbody tr{cursor:pointer}
+.race-table tbody tr:hover{background:#eef3f8}
+.race-table .rname,.pred-table .hname,.bet-table td:nth-child(2),.bet-table td:nth-child(4){text-align:left;white-space:normal}
+.pred-table tr.top-pick{background:#fdecec}
+.past-table .win{background:#fff2cc;font-weight:700}
+.bet-table .bt{font-weight:700;white-space:nowrap}
+
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.info-grid>div{background:#f7f9fb;border-radius:8px;padding:8px 10px;font-weight:600}
+.info-grid span{display:block;font-size:.72rem;color:var(--muted);font-weight:500}
+
+.spark{width:130px;height:26px;display:block;margin:0 auto}
+.note-chip{display:inline-block;font-size:.7rem;background:#fce9d9;color:#9a5b1d;border-radius:9px;padding:0 6px;margin-left:4px}
+
+.anim-wrap{margin-top:8px}
+#raceCanvas{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#eef2f6;touch-action:none}
+.anim-controls{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.anim-controls button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+.anim-controls input[type=range]{flex:1;min-width:140px}
+
+.horse-past{border-bottom:1px solid var(--line);padding:6px 0}
+.horse-past summary{cursor:pointer;font-weight:600;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+
+/* ROI / 履歴 */
+.roi-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:12px}
+.roi-summary>div{background:#f7f9fb;border-radius:8px;padding:8px 10px;font-weight:700}
+.roi-summary span{display:block;font-size:.72rem;color:var(--muted);font-weight:500}
+.roi-chart{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+.ledger-table td,.ledger-table th{border-bottom:1px solid var(--line);padding:5px 7px;text-align:center;white-space:nowrap}
+.ledger-detail summary{cursor:pointer;font-weight:600;margin-top:8px}
+
+/* 推奨買い目 / チェッカー */
+.track-badge{font-size:.66rem;background:#e3eefb;color:#2c5b95;border-radius:8px;padding:0 5px}
+.odds-in{width:76px;padding:2px 4px;border:1px solid var(--line);border-radius:4px}
+.bet-table td .ev{font-weight:700}
+#betChecker .bc-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:8px 0}
+#betChecker select{padding:3px 6px}
+.bc-horses{display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 0}
+.bc-chk{font-size:.85rem;white-space:nowrap}
+.bc-axis{font-size:.9rem}
+
+.site-footer{margin:40px auto 24px;color:var(--muted);font-size:.8rem}
+.site-footer .disclaimer{border-top:1px solid var(--line);padding-top:8px}
+
+@media(max-width:640px){
+  .info-grid{grid-template-columns:repeat(2,1fr)}
+  h1{font-size:1.25rem}
+}

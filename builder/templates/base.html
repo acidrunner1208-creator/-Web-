@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}競馬シミュレーター{% endblock %}</title>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">🐎 競馬シミュレーター</a>
+    <nav>
+      <a href="/">レース</a>
+      <a href="/about.html">このアプリについて</a>
+    </nav>
+  </div>
+</header>
+
+{% if meta.demo_mode %}
+<div class="banner demo">デモモード: 表示中のデータは合成された架空のものです。</div>
+{% endif %}
+
+<main class="wrap">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer wrap">
+  <p>
+    データ生成: {{ meta.generated_at[:16].replace("T", " ") }} UTC ／ 対象: {{ meta.dates | join(" ・ ") }}
+    {% if meta.model_state and meta.model_state.trained %}
+      ／ 学習済みレース数: {{ "{:,}".format(meta.model_state.n_races) }}
+    {% endif %}
+  </p>
+  <p class="disclaimer">
+    本アプリは過去データに基づく統計的シミュレーションであり、的中を保証しません。
+    馬券は自己責任で。数値はすべて「{{ meta.n_sims }}回シミュレーション」上の相対的な傾向です。
+    {{ meta.note }}
+  </p>
+</footer>
+</body>
+</html>
