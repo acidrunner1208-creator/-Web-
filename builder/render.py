@@ -42,6 +42,90 @@ def bars_svg(values: list[float], width: int = 150, height: int = 30, color: str
     return f'<svg viewBox="0 0 {width} {height}" class="spark" aria-label="着順分布">{rects}</svg>'
 
 
+_PALETTE = [
+    "#d64545", "#3f6fb0", "#4a9d63", "#c98a2b", "#8a5cb4", "#2aa4a4", "#c0577f",
+    "#6b8e23", "#b5651d", "#5b7db1", "#7a9e3a", "#a34a8f", "#3d8f8f", "#9c6b3f",
+    "#5f6caf", "#c05b5b", "#4f9a4f", "#b98a3a",
+]
+
+
+def positions_chart_svg(animation: dict | None, width: int = 760, height: int = 320) -> str:
+    """スタート直後からゴールまでの位置取り(隊列)の推移予想を折れ線で示す静的図。
+
+    横軸 = レースの進行 (左=スタート直後 / 右=ゴール)、縦軸 = そのときの隊列内の順位。
+    """
+    if not animation or not animation.get("horses"):
+        return ""
+    horses = animation["horses"]
+    ticks = animation["ticks"]
+    dist = animation.get("distance") or 0
+    H = len(horses)
+    if H < 2:
+        return ""
+
+    padL, padR, padT, padB = 44, 92, 40, 34
+    plot_w = width - padL - padR
+    plot_h = height - padT - padB
+
+    def x(t: int) -> float:
+        return padL + t / ticks * plot_w
+
+    def y(rank: float) -> float:
+        return padT + (rank - 1) / (H - 1) * plot_h
+
+    top3 = {h["num"] for h in horses if h["finish"] <= 3}
+    parts: list[str] = [
+        f'<svg viewBox="0 0 {width} {height}" class="pos-chart" role="img" '
+        f'aria-label="展開予想（位置取りの推移）">',
+        f'<rect x="{padL}" y="{padT}" width="{plot_w:.0f}" height="{plot_h:.0f}" fill="#fafbfc" stroke="#e2e6ea"/>',
+        # 序盤帯
+        f'<rect x="{padL}" y="{padT}" width="{plot_w * 0.18:.0f}" height="{plot_h:.0f}" fill="#eef3f8"/>',
+        f'<text x="{padL + 4}" y="{padT + 13}" font-size="10" fill="#7a8a99">スタート〜序盤</text>',
+    ]
+    # 距離グリッド
+    for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+        gx = padL + frac * plot_w
+        parts.append(f'<line x1="{gx:.1f}" y1="{padT}" x2="{gx:.1f}" y2="{padT + plot_h}" stroke="#e2e6ea"/>')
+        m = int(round(dist * frac / 50) * 50) if dist else int(frac * 100)
+        parts.append(
+            f'<text x="{gx:.1f}" y="{padT + plot_h + 14}" font-size="10" fill="#888" '
+            f'text-anchor="middle">{m}{"m" if dist else "%"}</text>'
+        )
+    # 順位グリッド (1,3,5,...)
+    for rank in range(1, H + 1, 2):
+        gy = y(rank)
+        parts.append(f'<line x1="{padL}" y1="{gy:.1f}" x2="{padL + plot_w}" y2="{gy:.1f}" stroke="#eef1f4"/>')
+        parts.append(f'<text x="{padL - 6}" y="{gy + 3:.1f}" font-size="10" fill="#888" text-anchor="end">{rank}</text>')
+
+    parts.append(
+        f'<text x="{padL}" y="{padT - 22}" font-size="11" fill="#555">'
+        f'← スタート直後　　隊列（縦=順位, 上=前）　　ゴール →</text>'
+    )
+
+    order = sorted(range(H), key=lambda i: horses[i]["finish"])
+    for i in order:
+        h = horses[i]
+        rt = h["rank_track"]
+        pts = " ".join(f"{x(t):.1f},{y(rt[t]):.1f}" for t in range(ticks + 1))
+        col = _PALETTE[i % len(_PALETTE)]
+        hot = h["num"] in top3
+        parts.append(
+            f'<polyline points="{pts}" fill="none" stroke="{col}" '
+            f'stroke-width="{2.4 if hot else 1.2}" stroke-opacity="{1 if hot else 0.5}" '
+            f'stroke-linejoin="round"/>'
+        )
+        ey = y(rt[-1])
+        parts.append(
+            f'<circle cx="{x(ticks):.1f}" cy="{ey:.1f}" r="{3.4 if hot else 2.4}" fill="{col}"/>'
+        )
+        parts.append(
+            f'<text x="{x(ticks) + 6:.1f}" y="{ey + 3:.1f}" font-size="{10.5 if hot else 9.5}" '
+            f'fill="{col if hot else "#999"}">{h["num"]}. {h["name"][:6]}</text>'
+        )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def line_chart_svg(points: list[float], width: int = 640, height: int = 220) -> str:
     """累積損益の折れ線 (0 基準線つき)。"""
     if len(points) < 2:
@@ -72,6 +156,7 @@ def line_chart_svg(points: list[float], width: int = 640, height: int = 220) -> 
 env.filters["pct"] = _pct
 env.filters["yen"] = _yen
 env.globals["bars_svg"] = bars_svg
+env.globals["positions_chart_svg"] = positions_chart_svg
 env.globals["now_jst"] = lambda: datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
 
 

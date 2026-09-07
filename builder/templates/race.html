@@ -27,8 +27,18 @@
 <section class="card">
   <h2>レース展開シミュレーション</h2>
   <p class="muted">{{ r.animation.pace_note }}</p>
+
+  <h3>展開予想図（スタート直後 → ゴール）</h3>
+  <p class="muted">各馬がレース中どの位置（隊列内の順位）で運ぶかの予想。太線＝上位3頭。</p>
+  <div class="table-scroll">{{ positions_chart_svg(r.animation) | safe }}</div>
+
+  <h3>アニメーション</h3>
+  <p class="muted">
+    横位置＝進んだ距離（右がゴール）。各馬は枠順ごとのレーンに固定して表示するので、
+    前後の位置関係がそのまま隊列です。右上のミニマップが{{ r.venue }}コース上の現在位置。
+  </p>
   <div class="anim-wrap">
-    <canvas id="raceCanvas" width="900" height="460" aria-label="レース展開アニメーション"></canvas>
+    <canvas id="raceCanvas" width="900" height="480" aria-label="レース展開アニメーション"></canvas>
     <div class="anim-controls">
       <button id="animPlay" type="button">▶ 再生</button>
       <button id="animReplay" type="button">↻ 最初から</button>

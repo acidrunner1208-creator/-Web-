@@ -1,10 +1,14 @@
-/* レース展開アニメーション — 各競馬場のコース形状を模した俯瞰ビュー (依存なし)
+/* レース展開アニメーション (依存なし)
    window.__RACE_ANIM__ = {
-     ticks, distance, direction, venue, surface, pace, pace_note, horse_length_m,
+     ticks, distance, direction, venue, surface, pace, pace_note,
      horses: [{ num, name, style, draw, rank_track:[...], pos_track:[0..1...], finish }]
    }
-   各馬を「レース距離のどこまで進んだか(pos_track)」で個別に配置し、隊列(前後の位置関係)が
-   見えるようにする。横は枠順ベース＋重なり回避で少しずつずらす。
+
+   表示は 2 段構成:
+   - 上: コースのミニマップ (各競馬場の形状を再現。隊列の「現在地」を点で表示)
+   - 下: レーン・ストリップ。横 = 進んだ距離 (右がゴール)、縦 = 枠順で固定したレーン。
+        馬同士が絶対に重ならないので前後関係 = 隊列がそのまま読める。奥行き感のため
+        進むほどマーカーを少し大きく描き、遠近のレーン線を添える。
 */
 (function () {
   "use strict";
@@ -14,67 +18,31 @@
 
   var ctx = canvas.getContext("2d");
   var W = canvas.width, H = canvas.height;
-  var horses = data.horses;
-  var n = horses.length;
   var ticks = data.ticks;
-  var DUR = 11000, HOLD = 2000;
-  var R = n > 14 ? 7 : 8;                      // 馬マーカー半径
   var D = data.distance || 1600;
+  var DUR = 11000, HOLD = 2200;
+
+  // 枠順で安定ソート (上のレーン = 内枠)
+  var horses = data.horses.slice().sort(function (a, b) {
+    return (a.draw || a.num) - (b.draw || b.num) || a.num - b.num;
+  });
+  var n = horses.length;
 
   var PALETTE = ["#d64545","#3f6fb0","#4a9d63","#c98a2b","#8a5cb4","#2aa4a4","#c0577f",
     "#6b8e23","#b5651d","#5b7db1","#7a9e3a","#a34a8f","#3d8f8f","#9c6b3f","#5f6caf",
     "#c05b5b","#4f9a4f","#b98a3a"];
+  var colorOf = {};
+  horses.forEach(function (h, i) { colorOf[h.num] = PALETTE[i % PALETTE.length]; });
 
-  // --- コース形状パラメータ (相対) ---
   var GEO = {
-    "東京":{w:0.94,h:0.60,straight:0.62,lap:2000}, "中山":{w:0.72,h:0.72,straight:0.32,lap:1800},
-    "阪神":{w:0.84,h:0.64,straight:0.44,lap:1800}, "京都":{w:0.88,h:0.60,straight:0.42,lap:1900},
-    "中京":{w:0.80,h:0.66,straight:0.48,lap:1700}, "新潟":{w:0.96,h:0.50,straight:0.66,lap:2000},
-    "福島":{w:0.68,h:0.74,straight:0.34,lap:1700}, "小倉":{w:0.66,h:0.74,straight:0.30,lap:1650},
-    "札幌":{w:0.78,h:0.68,straight:0.40,lap:1650}, "函館":{w:0.62,h:0.76,straight:0.28,lap:1600}
+    "東京":{w:0.95,h:0.58,straight:0.62,lap:2000}, "中山":{w:0.72,h:0.74,straight:0.30,lap:1800},
+    "阪神":{w:0.85,h:0.62,straight:0.44,lap:1800}, "京都":{w:0.90,h:0.58,straight:0.44,lap:1900},
+    "中京":{w:0.80,h:0.64,straight:0.48,lap:1700}, "新潟":{w:0.97,h:0.48,straight:0.68,lap:2000},
+    "福島":{w:0.68,h:0.76,straight:0.32,lap:1700}, "小倉":{w:0.66,h:0.76,straight:0.28,lap:1650},
+    "札幌":{w:0.78,h:0.68,straight:0.38,lap:1650}, "函館":{w:0.62,h:0.78,straight:0.26,lap:1600}
   };
   var g = GEO[data.venue] || {w:0.82,h:0.64,straight:0.46,lap:1800};
   var rightHanded = (data.direction || "").indexOf("右") >= 0;
-
-  var M = 56;
-  var cx = W / 2, cy = H / 2 + 6;
-  var ry = g.h * (H / 2 - M);
-  var rx = g.w * (W / 2 - M);
-  var L = Math.max(60, g.straight * 2 * rx);
-  var curve = Math.PI * ry;
-  var perim = 2 * L + 2 * curve;
-  var finishS = L;
-  var laneGap = Math.min(11, (ry * 0.72) / Math.max(n, 6));
-
-  // s (周回距離) -> {x,y}  スタジアム形 (ホーム直線 下・ゴール右端)
-  function pathPoint(s) {
-    s = ((s % perim) + perim) % perim;
-    if (s <= L) return { x: cx - L / 2 + s, y: cy + ry };
-    s -= L;
-    if (s <= curve) {
-      var a = (s / curve) * Math.PI;
-      return { x: cx + L / 2 + ry * Math.sin(a), y: cy + ry * Math.cos(a) };
-    }
-    s -= curve;
-    if (s <= L) return { x: cx + L / 2 - s, y: cy - ry };
-    s -= L;
-    var b = (s / curve) * Math.PI;
-    return { x: cx - L / 2 - ry * Math.sin(b), y: cy - ry * Math.cos(b) };
-  }
-  function tangent(s) {
-    var p1 = pathPoint(s - 2), p2 = pathPoint(s + 2);
-    var dx = p2.x - p1.x, dy = p2.y - p1.y, m = Math.hypot(dx, dy) || 1;
-    return { x: dx / m, y: dy / m };
-  }
-
-  var raceLenS = Math.min(0.97, D / g.lap) * perim;
-
-  // レース進捗 frac(0..1) -> 周回位置 s  (frac=1 でゴール)
-  function sAt(frac) {
-    return rightHanded
-      ? finishS + (1 - frac) * raceLenS
-      : finishS - (1 - frac) * raceLenS;
-  }
 
   function interp(arr, tf) {
     var i = Math.floor(tf), fr = tf - i;
@@ -82,123 +50,183 @@
     return a + (b - a) * fr;
   }
 
-  function drawTrack() {
-    ctx.fillStyle = "#eef2f6"; ctx.fillRect(0, 0, W, H);
-
-    // トラック帯
-    ctx.beginPath();
-    for (var s = 0; s <= perim; s += 6) {
-      var p = pathPoint(s);
-      if (s === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  // ---------- ミニマップ用スタジアム形 ----------
+  function makeCourse(cx, cy, rx, ry, straight) {
+    var L = Math.max(16, straight * 2 * rx), curve = Math.PI * ry;
+    var perim = 2 * L + 2 * curve, finishS = L;
+    function pp(s) {
+      s = ((s % perim) + perim) % perim;
+      if (s <= L) return { x: cx - L / 2 + s, y: cy + ry };
+      s -= L;
+      if (s <= curve) { var a = (s / curve) * Math.PI; return { x: cx + L / 2 + ry * Math.sin(a), y: cy + ry * Math.cos(a) }; }
+      s -= curve;
+      if (s <= L) return { x: cx + L / 2 - s, y: cy - ry };
+      s -= L; var b = (s / curve) * Math.PI;
+      return { x: cx - L / 2 - ry * Math.sin(b), y: cy - ry * Math.cos(b) };
     }
-    ctx.closePath();
-    ctx.lineWidth = 40; ctx.lineJoin = "round";
-    ctx.strokeStyle = (data.surface === "ダ") ? "#c69c6a" : "#7fae6c";
-    ctx.stroke();
-    ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,.65)"; ctx.stroke();
-
-    // ゴール線
-    var f = pathPoint(finishS), ft = tangent(finishS);
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(f.x - ft.y * 22, f.y + ft.x * 22);
-    ctx.lineTo(f.x + ft.y * 22, f.y - ft.x * 22);
-    ctx.stroke();
-    ctx.fillStyle = "#222"; ctx.font = "bold 12px system-ui"; ctx.textAlign = "center";
-    ctx.fillText("ゴール", f.x, f.y + 36);
-
-    // 3〜4コーナー
-    var cS = rightHanded ? finishS + L + curve / 2 : finishS - L - curve / 2;
-    var cp = pathPoint(cS);
-    ctx.fillStyle = "#555"; ctx.font = "11px system-ui";
-    ctx.fillText("3〜4コーナー", cp.x, cp.y);
-
-    // スタート地点
-    var st = pathPoint(sAt(0));
-    ctx.fillStyle = "#888"; ctx.beginPath(); ctx.arc(st.x, st.y, 3, 0, 7); ctx.fill();
-    ctx.fillText("スタート", st.x, st.y + (st.y > cy ? 16 : -10));
-
-    ctx.fillStyle = "#555"; ctx.textAlign = "left"; ctx.font = "12px system-ui";
-    ctx.fillText((data.venue || "") + "（" + (rightHanded ? "右回り" : "左回り") + " / " +
-      (data.surface === "ダ" ? "ダート" : "芝") + (D ? D + "m" : "") + "）", 12, 20);
+    return { pp: pp, perim: perim, finishS: finishS };
   }
 
-  var top3 = horses.filter(function (h) { return h.finish <= 3; }).map(function (h) { return h.num; });
+  var MM = { x: 20, y: 14, w: 210, h: 104 };
+  var mmc = makeCourse(MM.x + MM.w / 2, MM.y + MM.h / 2, g.w * (MM.w / 2 - 10),
+                       g.h * (MM.h / 2 - 10), g.straight);
+  var mmRaceLen = Math.min(0.97, D / g.lap) * mmc.perim;
+  function mmSAt(frac) {
+    return rightHanded ? mmc.finishS + (1 - frac) * mmRaceLen
+                       : mmc.finishS - (1 - frac) * mmRaceLen;
+  }
+
+  function drawMinimap(items, leadNum) {
+    ctx.save();
+    ctx.strokeStyle = "#c7d0d8"; ctx.lineWidth = 9; ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (var s = 0; s <= mmc.perim; s += 5) {
+      var p = mmc.pp(s); if (s === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle = (data.surface === "ダ") ? "#c69c6a" : "#8fb87a"; ctx.lineWidth = 5; ctx.stroke();
+
+    var f = mmc.pp(mmc.finishS);
+    ctx.fillStyle = "#e23"; ctx.beginPath(); ctx.arc(f.x, f.y, 2.6, 0, 7); ctx.fill();
+
+    items.forEach(function (o) {
+      var p = mmc.pp(mmSAt(o.pr));
+      var lead = o.h.num === leadNum;
+      ctx.beginPath(); ctx.arc(p.x, p.y, lead ? 4 : 2.7, 0, 7);
+      ctx.fillStyle = colorOf[o.h.num]; ctx.fill();
+      if (lead) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke(); }
+    });
+
+    ctx.fillStyle = "#5b6b7a"; ctx.font = "10px system-ui"; ctx.textAlign = "left";
+    ctx.fillText((data.venue || "") + "　" + (rightHanded ? "右回り" : "左回り") + "　" +
+      (data.surface === "ダ" ? "ダート" : "芝") + D + "m", MM.x, MM.y + MM.h + 12);
+    ctx.restore();
+  }
+
+  // ---------- レーン・ストリップ ----------
+  var GUT = 150;                       // 左の馬名ラベル幅
+  var SX0 = GUT + 6, SX1 = W - 74;     // 走路の左右
+  var SY0 = 150, SY1 = H - 18;         // 走路の上下
+  var laneH = (SY1 - SY0) / n;
+  var vanish = { x: SX0 - 520, y: (SY0 + SY1) / 2 };   // 遠近の消失点 (左奥)
+
+  function laneY(i) { return SY0 + laneH * (i + 0.5); }
+  function progX(pr) { return SX0 + Math.max(-0.03, Math.min(1.03, pr)) * (SX1 - SX0); }
+
+  function drawStrip(items, prog, leadPr, leadNum) {
+    // 走路の地色 (上=奥 を少し暗く)
+    var grad = ctx.createLinearGradient(0, SY0, 0, SY1);
+    var base = (data.surface === "ダ") ? ["#b98f5e", "#d8b483"] : ["#6f9e5e", "#93bd7c"];
+    grad.addColorStop(0, base[0]); grad.addColorStop(1, base[1]);
+    ctx.fillStyle = grad;
+    ctx.fillRect(SX0 - 4, SY0, SX1 - SX0 + 8, SY1 - SY0);
+
+    // 遠近のレーン線 (消失点へ収束)
+    ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.lineWidth = 1;
+    for (var i = 0; i <= n; i++) {
+      var y = SY0 + laneH * i;
+      ctx.beginPath(); ctx.moveTo(SX1, y);
+      ctx.lineTo(vanish.x, vanish.y + (y - vanish.y) * 0.12);
+      ctx.stroke();
+    }
+    // 距離目盛り (200m 毎)
+    ctx.fillStyle = "#7a8790"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
+    var step = D > 2000 ? 400 : 200;
+    for (var m = 0; m <= D; m += step) {
+      var gx = progX(m / D);
+      ctx.strokeStyle = "rgba(255,255,255,.28)";
+      ctx.beginPath(); ctx.moveTo(gx, SY0); ctx.lineTo(gx, SY1); ctx.stroke();
+      ctx.fillText((D - m) + "m", gx, SY0 - 6);
+    }
+    ctx.textAlign = "left"; ctx.fillText("スタート", SX0, SY0 - 20);
+    ctx.textAlign = "right"; ctx.fillText("ゴール", SX1, SY0 - 20);
+
+    // ゴール標識
+    ctx.fillStyle = "#fff"; ctx.fillRect(SX1 - 2, SY0, 4, SY1 - SY0);
+    for (var k = 0; k < (SY1 - SY0) / 8; k++) {
+      ctx.fillStyle = k % 2 ? "#111" : "#fff";
+      ctx.fillRect(SX1 + 2, SY0 + k * 8, 8, 8);
+    }
+
+    // 先頭ライン
+    var lx = progX(leadPr);
+    ctx.strokeStyle = "rgba(20,20,20,.35)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(lx, SY0); ctx.lineTo(lx, SY1); ctx.stroke();
+    ctx.setLineDash([]);
+
+    var atFinish = prog >= 0.999;
+    items.forEach(function (o, idx) {
+      var y = laneY(idx);
+      var x = progX(o.pr);
+      var col = colorOf[o.h.num];
+      var r = 6.5 + 3.2 * Math.max(0, Math.min(1, o.pr));    // 進むほど大きく (奥行き感)
+      var dim = atFinish && o.h.finish > 3;
+
+      // ラベル (左ガター)
+      ctx.globalAlpha = dim ? 0.4 : 1;
+      ctx.fillStyle = col; ctx.fillRect(6, y - 7, 5, 14);
+      ctx.fillStyle = dim ? "#999" : "#2a2f34";
+      ctx.font = (o.h.finish <= 3 && atFinish ? "bold " : "") + "11px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText(o.h.num + " " + clip(o.h.name, 7), 16, y + 3.5);
+
+      // 影 + 馬マーカー (右向きのしずく形)
+      ctx.fillStyle = "rgba(0,0,0,.16)";
+      ctx.beginPath(); ctx.ellipse(x + 1, y + r * 0.55, r * 1.05, r * 0.5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x + r * 1.5, y);
+      ctx.quadraticCurveTo(x + r * 0.4, y - r, x - r * 0.7, y - r * 0.6);
+      ctx.quadraticCurveTo(x - r * 1.1, y, x - r * 0.7, y + r * 0.6);
+      ctx.quadraticCurveTo(x + r * 0.4, y + r, x + r * 1.5, y);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.font = "bold " + (r + 1) + "px system-ui"; ctx.textAlign = "center";
+      ctx.fillText(o.h.num, x + r * 0.15, y + r * 0.4);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  function clip(s, k) { return (s && s.length > k) ? s.slice(0, k) : (s || ""); }
+
+  // ---------- 状態 & ループ ----------
   var playBtn = document.getElementById("animPlay");
   var replayBtn = document.getElementById("animReplay");
   var scrub = document.getElementById("animScrub");
   var label = document.getElementById("animLabel");
   var start = null, playing = false, pausedAt = 0;
 
-  function layout(tf) {
-    // 各馬: 進捗 -> トラック上の点 + 枠順ベースの横オフセット
-    var items = horses.map(function (h, idx) {
-      var pr = interp(h.pos_track, tf);
-      var s = sAt(pr);
-      var base = pathPoint(s);
-      var tg = tangent(s);
-      var nrm = { x: -tg.y, y: tg.x };
-      var lane = ((h.draw || idx + 1) - (n + 1) / 2) * laneGap;
-      return {
-        h: h, idx: idx, pr: pr, base: base, nrm: nrm,
-        x: base.x + nrm.x * lane, y: base.y + nrm.y * lane
-      };
+  function compute(tf) {
+    var arr = horses.map(function (h) {
+      return { h: h, pr: interp(h.pos_track, tf) };
     });
-    // 重なり回避 (screen空間で押し広げ)
-    var minD = R * 2 + 3;
-    for (var pass = 0; pass < 6; pass++) {
-      for (var i = 0; i < items.length; i++) {
-        for (var j = i + 1; j < items.length; j++) {
-          var A = items[i], B = items[j];
-          var dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy);
-          if (d > 0.001 && d < minD) {
-            var k = (minD - d) / 2 / d;
-            A.x -= dx * k; A.y -= dy * k; B.x += dx * k; B.y += dy * k;
-          }
-        }
-      }
-    }
-    // トラック帯からはみ出さないよう中心線からの距離をクランプ
-    var maxOff = ry * 0.5;
-    items.forEach(function (o) {
-      var dx = o.x - o.base.x, dy = o.y - o.base.y, dist = Math.hypot(dx, dy);
-      if (dist > maxOff) { o.x = o.base.x + dx / dist * maxOff; o.y = o.base.y + dy / dist * maxOff; }
-    });
-    return items;
+    var lead = arr.slice().sort(function (a, b) { return b.pr - a.pr; })[0];
+    return { items: arr, leadPr: lead.pr, leadNum: lead.h.num,
+             order: arr.slice().sort(function (a, b) { return b.pr - a.pr; }) };
   }
 
   function draw(prog) {
     ctx.clearRect(0, 0, W, H);
-    drawTrack();
-    var tf = prog * ticks;
-    var items = layout(tf);
+    ctx.fillStyle = "#eef2f6"; ctx.fillRect(0, 0, W, H);
+    var st = compute(prog * ticks);
 
-    var atFinish = prog >= 0.999;
-    // 後方の馬から描画 (先頭を前面に)
-    items.slice().sort(function (a, b) { return a.pr - b.pr; }).forEach(function (o) {
-      var col = PALETTE[o.idx % PALETTE.length];
-      var dim = atFinish && top3.indexOf(o.h.num) === -1;
-      ctx.globalAlpha = dim ? 0.3 : 1;
-      ctx.fillStyle = col;
-      ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, 7); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#fff"; ctx.font = "bold " + (R + 2) + "px system-ui"; ctx.textAlign = "center";
-      ctx.fillText(o.h.num, o.x, o.y + R * 0.45);
-      ctx.globalAlpha = 1;
+    drawStrip(st.items, prog, st.leadPr, st.leadNum);
+    drawMinimap(st.items, st.leadNum);
+
+    // 現在の隊列順 (ミニマップ右)
+    ctx.textAlign = "left"; ctx.font = "11px system-ui";
+    var bx = MM.x + MM.w + 18;
+    ctx.fillStyle = "#333"; ctx.font = "bold 11px system-ui";
+    ctx.fillText(prog >= 0.999 ? "着順" : "現在の隊列", bx, MM.y + 12);
+    ctx.font = "11px system-ui";
+    st.order.slice(0, 6).forEach(function (o, i) {
+      ctx.fillStyle = i < 3 ? colorOf[o.h.num] : "#888";
+      ctx.fillText((i + 1) + "  " + o.h.num + ". " + clip(o.h.name, 8) + "（" + o.h.style + "）",
+        bx, MM.y + 30 + i * 14);
     });
 
-    // 隊列リスト (右上) — 現在の並び順
-    var byPos = items.slice().sort(function (a, b) { return b.pr - a.pr; });
-    ctx.textAlign = "left"; ctx.font = "12px system-ui";
-    ctx.fillStyle = "rgba(255,255,255,.82)"; ctx.fillRect(W - 244, 28, 236, 20 + Math.min(byPos.length, 8) * 16);
-    byPos.slice(0, 8).forEach(function (o, i) {
-      ctx.fillStyle = i < 3 ? "#222" : "#777";
-      ctx.fillText((i + 1) + "  " + o.h.num + ". " + o.h.name + "（" + o.h.style + "）", W - 238, 44 + i * 16);
-    });
-
-    var leadPr = byPos.length ? byPos[0].pr : prog;
-    var remain = Math.max(0, Math.round(D * (1 - leadPr) / 50) * 50);
-    label.textContent = atFinish ? "ゴール" : ("先頭 残り約 " + remain + "m");
+    var remain = Math.max(0, Math.round(D * (1 - st.leadPr) / 50) * 50);
+    label.textContent = prog >= 0.999 ? "ゴール" : ("先頭 残り約 " + remain + "m");
     scrub.value = String(Math.round(prog * 100));
   }
 
