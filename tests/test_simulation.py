@@ -59,8 +59,16 @@ def test_animation_course():
     assert a["venue"] in ("東京", "中山", "阪神")
     for h in a["horses"]:
         assert len(h["rank_track"]) == a["ticks"] + 1
+        assert len(h["pos_track"]) == a["ticks"] + 1
         assert h["rank_track"][-1] == h["finish"]
+        # 各馬の進捗はほぼ単調増加 (隊列変化による小さな戻りは許容)、ゴール付近で 1.0 近辺
+        assert all(b >= a_ - 0.03 for a_, b in zip(h["pos_track"], h["pos_track"][1:]))
+        assert h["pos_track"][-1] >= h["pos_track"][0]
+        assert 0.82 <= h["pos_track"][-1] <= 1.02
     assert sorted(h["rank_track"][-1] for h in a["horses"]) == list(range(1, len(a["horses"]) + 1))
+    # ゴール時の進捗の並び == 着順
+    by_pos = sorted(a["horses"], key=lambda h: h["pos_track"][-1], reverse=True)
+    assert [h["finish"] for h in by_pos] == list(range(1, len(a["horses"]) + 1))
 
 
 def test_full_build_and_render(tmp_path: Path):

@@ -44,7 +44,7 @@ def _race_list(ymd: str):
     return fetch_race_list(ymd)
 
 
-def _race_card(race_id: str) -> Race:
+def _race_card(race_id: str, store=None) -> Race:
     s = get_settings()
     if s.demo_mode:
         from builder.scraping.demo import demo_race_card
@@ -52,7 +52,7 @@ def _race_card(race_id: str) -> Race:
         return demo_race_card(race_id)
     from builder.scraping.netkeiba import fetch_race_card
 
-    return fetch_race_card(race_id, history_limit=s.history_limit)
+    return fetch_race_card(race_id, history_limit=s.history_limit, store=store)
 
 
 def _workouts(race_id: str) -> dict:
@@ -114,6 +114,14 @@ def run(dates: list[str], limit: int | None = None, out_dir: Path | None = None)
     out_dir = out_dir or s.out_path
     races_out: list[dict] = []
     done = 0
+
+    store = None
+    if not s.demo_mode:
+        from builder.store import HorseStore
+
+        store = HorseStore()
+    active_ids: set[str] = set()
+
     for ymd in dates:
         iso = f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]}"
         try:
@@ -127,12 +135,13 @@ def run(dates: list[str], limit: int | None = None, out_dir: Path | None = None)
             if limit and done >= limit:
                 break
             try:
-                race = _race_card(it.race_id)
+                race = _race_card(it.race_id, store=store)
                 race.kaisai_date = iso
                 race.race_name = race.race_name or it.race_name
                 race.start_time = race.start_time or it.start_time
                 if len([e for e in race.entries if not e.scratched]) < 4:
                     continue
+                active_ids.update(e.horse_id for e in race.entries if e.horse_id)
                 payload = build_race_payload(race, s.n_sims, _workouts(it.race_id))
                 if not payload["horses"]:
                     continue
@@ -143,6 +152,13 @@ def run(dates: list[str], limit: int | None = None, out_dir: Path | None = None)
                          race.race_name or "", payload["confidence"], payload["model"])
             except Exception as exc:  # noqa: BLE001
                 log.warning("  %s failed: %s", it.race_id, exc)
+
+    if store is not None and active_ids:
+        removed = store.gc(active_ids)
+        store.save_if_dirty()
+        st = store.stats()
+        log.info("horse store: %d頭 / %d走 / %skB (引退・長期不出走 %d頭を削除)",
+                 st["horses"], st["runs"], st["kb"], len(removed))
 
     races_out.sort(key=lambda r: (r["kaisai_date"] or "", r["venue"] or "", r["race_number"] or 0))
     attention = sorted(races_out, key=lambda r: r["confidence"], reverse=True)[:3]

@@ -113,7 +113,8 @@ def fetch_race_list(kaisai_date: str) -> list[RaceListItem]:
 
 
 # ---------------------------------------------------------------- race card
-def fetch_race_card(race_id: str, *, with_history: bool = True, history_limit: int = 12) -> Race:
+def fetch_race_card(race_id: str, *, with_history: bool = True, history_limit: int = 12,
+                    store=None) -> Race:
     url = SHUTUBA_URL.format(race_id=race_id)
     html = get_client().get_text(url, TTL_SHUTUBA, encoding="utf-8")
     soup = BeautifulSoup(html, "lxml")
@@ -175,11 +176,22 @@ def fetch_race_card(race_id: str, *, with_history: bool = True, history_limit: i
 
     if with_history:
         for e in race.entries:
-            if e.horse_id and not e.scratched:
-                try:
+            if not (e.horse_id and not e.scratched):
+                continue
+            try:
+                if store is not None:
+                    cached = store.fresh_runs(e.horse_id)
+                    if cached is not None:
+                        e.past_runs = cached[:history_limit]
+                        store.touch(e.horse_id)
+                        continue
+                    runs, retired = _fetch_horse_history(e.horse_id, limit=history_limit)
+                    e.past_runs = runs
+                    store.put(e.horse_id, e.horse_name, runs, retired=retired)
+                else:
                     e.past_runs = fetch_horse_history(e.horse_id, limit=history_limit)
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("history failed for %s: %s", e.horse_id, exc)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("history failed for %s: %s", e.horse_id, exc)
 
     race.field_size = race.field_size or len([e for e in race.entries if not e.scratched])
     return race
@@ -232,12 +244,28 @@ def _parse_shutuba_row(tr) -> Entry | None:
 
 
 # ---------------------------------------------------------------- horse history
+def _detect_retired(soup) -> bool:
+    """netkeiba の馬ページから「抹消」(引退) を best-effort で判定。"""
+    for sel in (".horse_title", ".db_prof_area", ".Prof", "p.txt_01", ".db_main_deta"):
+        el = soup.select_one(sel)
+        if el and "抹消" in el.get_text():
+            return True
+    return False
+
+
 def fetch_horse_history(horse_id: str, limit: int = 12, before: date | None = None) -> list[PastRun]:
+    return _fetch_horse_history(horse_id, limit=limit, before=before)[0]
+
+
+def _fetch_horse_history(
+    horse_id: str, limit: int = 12, before: date | None = None
+) -> tuple[list[PastRun], bool]:
     html = get_client().get_text(HORSE_URL.format(horse_id=horse_id), TTL_HORSE)
     soup = BeautifulSoup(html, "lxml")
+    retired = _detect_retired(soup)
     table = soup.select_one("table.db_h_race_results, table.db_h_race_results_table")
     if not table:
-        return []
+        return [], retired
 
     header_cells = [th.get_text(strip=True) for th in table.select("tr")[0].select("th, td")]
     idx = {name: i for i, name in enumerate(header_cells)}
@@ -294,7 +322,7 @@ def fetch_horse_history(horse_id: str, limit: int = 12, before: date | None = No
         )
         if len(runs) >= limit:
             break
-    return runs
+    return runs, retired
 
 
 # ---------------------------------------------------------------- results (過去レース)

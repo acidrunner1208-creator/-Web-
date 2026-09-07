@@ -240,28 +240,44 @@ def _any_set_match(top3_cols_sorted: np.ndarray, combo_arr: np.ndarray) -> np.nd
 
 
 # --------------------------------------------------------------------- アニメーション
+_HORSE_LENGTH_M = 2.4  # 1馬身 ≈ 2.4m (隊列の縦の伸びを距離に換算するため)
+
+
 def build_animation(race: Race, models: list[HorseModel], horses: list[dict],
-                    pace_press: float, rng: np.random.Generator, ticks: int = 28) -> dict:
+                    pace_press: float, rng: np.random.Generator, ticks: int = 34) -> dict:
+    """各 tick で「その馬がレース距離のどこまで進んだか」(pos_track, 0..1) と
+    「隊列内の順位」(rank_track) を返す。前後の隊列が見えるアニメーション用。"""
     H = len(models)
     finish_rank = {h["num"]: h["rank"] for h in horses}
-    early = np.array([m.early_ratio for m in models])
+    early = np.array([m.early_ratio for m in models])           # 0=逃げ .. 1=追込
     nums = [m.num for m in models]
+    draws = np.array([float(m.draw or i + 1) for i, m in enumerate(models)])
 
-    early_score = -(early - 0.5)
-    final_score = np.array([(H - finish_rank[n]) / H for n in nums])
+    early_score = -(early - 0.5)                                # 高いほど前
+    final_score = np.array([0.5 - (finish_rank[n] - 1) / max(H - 1, 1) for n in nums])
     phase_shift = 0.55 + (early - 0.5) * 0.9
-    wobble_amp = 0.10 + 0.18 * early
+    wobble_amp = 0.08 + 0.14 * early
     wobble_phase = rng.uniform(0, 2 * np.pi, H)
-    wobble_freq = rng.uniform(1.5, 3.0, H)
+    wobble_freq = rng.uniform(1.4, 2.6, H)
 
-    tracks = np.zeros((ticks + 1, H))
+    D = float(race.distance or 1600)
+    ranks = np.zeros((ticks + 1, H), dtype=int)
+    posf = np.zeros((ticks + 1, H))
     for tk in range(ticks + 1):
         frac = tk / ticks
-        w = np.clip((frac - 0.12) / 0.88, 0, 1) ** np.clip(phase_shift / 0.55, 0.5, 2.2)
+        w = np.clip((frac - 0.10) / 0.90, 0, 1) ** np.clip(phase_shift / 0.55, 0.5, 2.2)
         score = (1 - w) * early_score + w * final_score
-        score = score + np.sin(frac * np.pi * wobble_freq + wobble_phase) * wobble_amp * (1 - frac)
-        tracks[tk] = (-score).argsort().argsort() + 1
-    tracks[ticks] = np.array([finish_rank[n] for n in nums])
+        score = score + np.sin(frac * np.pi * wobble_freq + wobble_phase) * wobble_amp * (1 - frac ** 2)
+        ranks[tk] = (-score).argsort().argsort() + 1
+        # 隊列の縦の伸び(m): 序盤は詰まり、道中〜終盤で開く。逃げ・追込差が大きいほど伸びる
+        spread_m = min(0.45 * D, 6.0 + (0.05 * D + 26.0) * frac + 14.0 * max(0.0, pace_press))
+        rel = (score.max() - score) / (np.ptp(score) + 1e-9)   # 先頭0 .. 最後方1
+        behind_m = rel * spread_m
+        posf[tk] = np.clip((frac * D - behind_m) / D, -0.03, 1.03)
+    ranks[ticks] = np.array([finish_rank[n] for n in nums])
+    # frac=1 の反復は final_score そのものなので並びは着順どおり。
+    # 先頭をゴール線 (pos=1.0) に合わせ、後続はその時点の隊列の伸びぶんだけ後方に置く。
+    posf[ticks] = posf[ticks] - posf[ticks].max() + 1.0
 
     pace_note = {
         "H": "前に行きたい馬が多く、締まったペースになりそう。差し・追込にチャンス。",
@@ -277,10 +293,12 @@ def build_animation(race: Race, models: list[HorseModel], horses: list[dict],
         "venue": race.venue,
         "pace": pace_label,
         "pace_note": pace_note[pace_label],
+        "horse_length_m": _HORSE_LENGTH_M,
         "horses": [
             {
-                "num": m.num, "name": m.name, "style": m.style,
-                "rank_track": [int(tracks[t, i]) for t in range(ticks + 1)],
+                "num": m.num, "name": m.name, "style": m.style, "draw": int(draws[i]),
+                "rank_track": [int(ranks[t, i]) for t in range(ticks + 1)],
+                "pos_track": [round(float(posf[t, i]), 4) for t in range(ticks + 1)],
                 "finish": finish_rank[m.num],
             }
             for i, m in enumerate(models)
