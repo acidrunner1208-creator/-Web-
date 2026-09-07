@@ -54,3 +54,9 @@ jobs:
           git commit -m "site: rebuild $(date -u +%FT%TZ)" || echo "no changes"
           git pull --rebase --autostash || true
           git push
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public --project-name=keiba-simulator --branch=main --commit-dirty=true

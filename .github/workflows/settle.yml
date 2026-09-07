@@ -14,7 +14,7 @@ concurrency:
 jobs:
   settle:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,3 +41,14 @@ jobs:
           git commit -m "settle: results + model update $(date -u +%FT%TZ)" || echo "no changes"
           git pull --rebase --autostash || true
           git push
+      - name: Rebuild site with updated ledger
+        env:
+          USER_AGENT: ${{ secrets.USER_AGENT }}
+          REQUEST_DELAY_SECONDS: "2.5"
+        run: python -m builder.build_site
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public --project-name=keiba-simulator --branch=main --commit-dirty=true
