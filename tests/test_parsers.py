@@ -68,6 +68,48 @@ def test_parse_shutuba_row():
     assert e.body_weight_diff == 4
 
 
+def test_grade_from_racename():
+    def g(html):
+        return nk._grade_from_racename(BeautifulSoup(html, "lxml").select_one(".RaceName"))
+
+    assert g('<h1 class="RaceName">ローズS<span class="Icon_GradeType Icon_GradeType2"></span></h1>') == "G2"
+    assert g('<h1 class="RaceName">チャレンジC<span class="Icon_GradeType Icon_GradeType3 Icon_GradePos01"></span></h1>') == "G3"
+    assert g('<h1 class="RaceName">ラジオ日本賞<span class="Icon_GradeType Icon_GradeType5"></span></h1>') == "リステッド"
+    # 格アイコンなし(条件戦)は None
+    assert g('<h1 class="RaceName">習志野特別<span class="Icon_GradeType Icon_GradeType13"></span></h1>') is None
+    assert g('<h1 class="RaceName">3歳未勝利</h1>') is None
+
+
+def test_fetch_race_card_promotes_grade_over_open(monkeypatch):
+    from builder.scraping import client
+
+    html = """
+    <div class="RaceList_Item02">
+      <h1 class="RaceName">ローズS
+        <span class="Icon_GradeType Icon_GradeType2 Icon_GradePos01"></span>
+        <span class="Icon_GradeType Icon_GradeType13 Icon_GradePos01"></span>
+      </h1>
+      <div class="RaceData01">15:45発走 / 芝1800m (右)</div>
+      <div class="RaceData02">
+        <span>4回</span><span>阪神</span><span>4日目</span>
+        <span>サラ系3歳</span><span>オープン</span><span>(国際)</span><span>16頭</span>
+      </div>
+    </div>
+    <table class="Shutuba_Table"></table>
+    """
+
+    class FakeClient:
+        def get_text(self, *a, **k):
+            return html
+
+    monkeypatch.setattr(client, "get_client", lambda: FakeClient())
+    monkeypatch.setattr(nk, "get_client", lambda: FakeClient())
+    race = nk.fetch_race_card("202609040411", with_history=False)
+    assert race.race_name == "ローズS"
+    assert race.race_class == "G2"
+    assert class_level(race.race_class) == class_level("G2")
+
+
 def test_parse_horse_results(monkeypatch):
     from builder.scraping import client
 

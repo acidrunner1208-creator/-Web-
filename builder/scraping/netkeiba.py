@@ -35,6 +35,26 @@ VENUE_BY_CODE = {
     "06": "中山", "07": "中京", "08": "京都", "09": "阪神", "10": "小倉",
 }
 
+# netkeiba の出馬表 .RaceName 内 <span class="Icon_GradeType{N}"> で格を表す。
+# 重賞は条件クラス欄が「オープン」表記のままなので、ここから昇格させる。
+GRADE_ICON = {
+    "1": "G1", "2": "G2", "3": "G3",
+    "5": "リステッド", "15": "リステッド",
+    "10": "J.G1", "11": "J.G2", "12": "J.G3",
+    "16": "3勝クラス", "17": "2勝クラス", "18": "1勝クラス",
+}
+
+
+def _grade_from_racename(name_el) -> str | None:
+    if name_el is None:
+        return None
+    for span in name_el.select("span[class]"):
+        for cls in span.get("class", []):
+            m = re.fullmatch(r"Icon_GradeType(\d+)", cls)
+            if m and m.group(1) in GRADE_ICON:
+                return GRADE_ICON[m.group(1)]
+    return None
+
 
 # ---------------------------------------------------------------- helpers
 def _num(text: str | None) -> float | None:
@@ -129,6 +149,7 @@ def fetch_race_card(race_id: str, *, with_history: bool = True, history_limit: i
     name_el = soup.select_one(".RaceName")
     if name_el:
         race.race_name = name_el.get_text(strip=True)
+    grade = _grade_from_racename(name_el)
 
     head = soup.select_one(".RaceData01")
     if head:
@@ -154,6 +175,9 @@ def fetch_race_card(race_id: str, *, with_history: bool = True, history_limit: i
         for token in spans:
             if "頭" in token:
                 race.field_size = _int(token)
+
+    if grade:  # 重賞/L は条件欄が「オープン」なのでアイコンの格を優先
+        race.race_class = grade
 
     mdate = re.search(r"kaisai_date=(\d{8})", html)
     if mdate:
