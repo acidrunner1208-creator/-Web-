@@ -166,7 +166,7 @@ LAUNCH_DATE = "2026-09-08"   # この日以降のレースを「運用開始か�
 # 成績を集計・グラフ化する買い目 (キー, 表示名) — 表示順
 TRACKED_BETS = [
     ("tansho", "単勝"),
-    ("sanrenpuku_formation", "3連複フォーメーション"),
+    ("sanrenpuku", "3連複"),
     ("sanrentan", "3連単"),
 ]
 

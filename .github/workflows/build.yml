@@ -58,12 +58,21 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy public --project-name=keiba-simulator --branch=main --commit-dirty=true
+      - name: Post race-day preview to X
+        continue-on-error: true
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          NOTE_URL: ${{ secrets.NOTE_URL }}
+        run: python -m builder.publish post-x --out public
       - name: Commit generated site (best effort)
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public
+          git add public builder/model/state
           git commit -m "site: rebuild $(date -u +%FT%TZ)" || echo "no changes"
           git pull --rebase --autostash || true
           git push

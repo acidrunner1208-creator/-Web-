@@ -38,6 +38,24 @@ Cloudflare Pages   public/ を世界規模CDNから配信（静的）
 Web 側は一切スクレイピング・計算をしません。単勝オッズのリアルタイム取得もしません
 （各買い目に「適正オッズ ＝ 1 ÷ 推定確率」を掲載）。
 
+### SNS 連携（X ＋ note）
+
+`builder/publish.py` がレース日の朝（馬場発表後の最終更新）に:
+
+- **X**：その日の自信度上位3レース＋軸・買い目（単勝／3連複／3連単）＋軸馬の
+  平均着順・勝率・複勝率・適正オッズ をスレッド投稿。最後に「全レース予想を
+  有料 note で公開中（¥300）」を返信でぶら下げる。
+  投稿には X API v2 の OAuth 1.0a 認証情報が必要（GitHub Secrets）:
+  `X_API_KEY` `X_API_SECRET` `X_ACCESS_TOKEN` `X_ACCESS_SECRET`。
+  未設定なら本文生成のみ（投稿しない）。
+- **note**：その日の全レース（1R〜12R）を1記事にまとめた本文を生成。note は
+  投稿 API が無いため、本文は Basic 認証つきの **`/announce.html`** に置かれる。
+  そこからコピーして note.com で ¥300 記事として公開する。記事 URL が決まったら
+  Secret `NOTE_URL` に設定すると X の宣伝リンクがその URL になる。
+
+`/announce.html` と `public/data/private/` は公開リポジトリにコミットしない
+（`.gitignore`）。Cloudflare へはデプロイされるが Basic 認証で保護される。
+
 ### 過去戦績の保存とお掃除
 
 各馬の過去戦績は `builder/data/horse_store.json.gz`（gzip + 1 頭あたり直近

@@ -2,6 +2,10 @@
 .cache/
 *.log
 
+# 有料note記事の本文・X投稿の下書き (Basic認証つきサイトには置くが公開リポジトリには入れない)
+public/data/private/
+public/announce.html
+
 # 生成物 (public/index.html, public/races/, public/data/ 等) は
 # GitHub Actions がコミットしてデプロイ経路になるため、あえて追跡する。
 # public/assets/ はソース。

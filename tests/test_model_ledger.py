@@ -39,21 +39,21 @@ def test_roi_headline_by_bet_type(monkeypatch):
     ledger = {"entries": [
         {"date": "2026-09-13", "stake": 300, "ret": 480, "profit": 180, "bets": [
             {"key": "tansho", "stake": 100, "ret": 480},
-            {"key": "sanrenpuku_formation", "stake": 100, "ret": 0},
+            {"key": "sanrenpuku", "stake": 100, "ret": 0},
             {"key": "sanrentan", "stake": 100, "ret": 0},
         ]},
         {"date": "2026-09-14", "stake": 300, "ret": 5000, "profit": 4700, "bets": [
             {"key": "tansho", "stake": 100, "ret": 0},
-            {"key": "sanrenpuku_formation", "stake": 100, "ret": 0},
+            {"key": "sanrenpuku", "stake": 100, "ret": 0},
             {"key": "sanrentan", "stake": 100, "ret": 5000},
         ]},
     ]}
     h = roi_headline(ledger)
     types = {t["key"]: t for t in h["by_type"]}
-    assert [t["key"] for t in h["by_type"]] == ["tansho", "sanrenpuku_formation", "sanrentan"]
+    assert [t["key"] for t in h["by_type"]] == ["tansho", "sanrenpuku", "sanrentan"]
     assert types["tansho"]["profit"] == 480 - 200
     assert types["sanrentan"]["profit"] == 5000 - 200
-    assert types["sanrenpuku_formation"]["profit"] == -200
+    assert types["sanrenpuku"]["profit"] == -200
     assert types["sanrentan"]["hit_races"] == 1
     assert len(types["tansho"]["series"]) == 3
 
@@ -120,11 +120,21 @@ def test_settle_tansho_and_trio():
     assert not miss["hit"] and miss["ret"] == 0
 
 
-def test_settle_sanrentan():
-    payouts = {"trifecta": [{"combo": [7, 4, 10], "yen": 18230, "pop": 42}]}
-    top3 = [7, 4, 10]
-    hit = _settle_bet({"key": "sanrentan", "type": "3連単", "nums": [7, 4, 10]}, top3, payouts)
-    assert hit["hit"] and hit["ret"] == 18230 and hit["stake"] == 100
-    # 着順違いは外れ
-    miss = _settle_bet({"key": "sanrentan", "type": "3連単", "nums": [4, 7, 10]}, top3, payouts)
-    assert not miss["hit"] and miss["ret"] == 0
+def test_settle_sanrentan_and_sanrenpuku_combos():
+    payouts = {
+        "trifecta": [{"combo": [7, 4, 10], "yen": 18230, "pop": 42}],
+        "trio": [{"combo": [4, 7, 10], "yen": 2610, "pop": 7}],
+    }
+    top3 = [7, 4, 10]  # 1着7 / 2着4 / 3着10
+
+    tri = _settle_bet({"key": "sanrentan", "type": "3連単",
+                       "combos": [[7, 4, 10], [7, 4, 5], [7, 10, 4]]}, top3, payouts)
+    assert tri["hit"] and tri["ret"] == 18230 and tri["stake"] == 300
+
+    tri_miss = _settle_bet({"key": "sanrentan", "type": "3連単",
+                            "combos": [[4, 7, 10], [10, 7, 4]]}, top3, payouts)
+    assert not tri_miss["hit"] and tri_miss["stake"] == 200
+
+    puk = _settle_bet({"key": "sanrenpuku", "type": "3連複",
+                       "combos": [[4, 7, 10], [4, 7, 12]]}, top3, payouts)
+    assert puk["hit"] and puk["ret"] == 2610 and puk["stake"] == 200

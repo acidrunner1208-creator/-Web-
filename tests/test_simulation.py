@@ -46,12 +46,18 @@ def test_recommended_bets_and_checker_data():
     race = demo_race_card("202605010107")
     p = build_race_payload(race, n_sims=4000)
     keys = {b["key"] for b in p["recommended"]}
-    assert {"tansho", "sanrenpuku_formation", "sanrentan"} <= keys
+    assert {"tansho", "sanrenpuku", "sanrentan"} <= keys
+    assert "sanrenpuku_nagashi" not in keys      # 3連複軸流しは廃止
     for b in p["recommended"]:
         assert 0.0 <= b["hit_prob"] <= 1.0
         assert b["fair_odds"] >= 1.0
     tracked = {b["key"] for b in p["recommended"] if b.get("tracked")}
-    assert tracked == {"tansho", "sanrenpuku_formation", "sanrentan"}
+    assert tracked == {"tansho", "sanrenpuku", "sanrentan"}
+    for key in ("sanrenpuku", "sanrentan"):
+        b = next(x for x in p["recommended"] if x["key"] == key)
+        assert b["method"] in ("流し", "フォーメーション")
+        assert b["unit"] == len(b["combos"]) >= 4
+        assert all(len(set(c)) == 3 for c in b["combos"])
     # 単勝の推定的中率 == 軸馬の勝率
     tan = next(b for b in p["recommended"] if b["key"] == "tansho")
     assert abs(tan["hit_prob"] - p["horses"][0]["win_prob"]) < 1e-6

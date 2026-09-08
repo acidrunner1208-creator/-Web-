@@ -55,21 +55,26 @@ def _settle_bet(bet: dict, top3: list[int], payouts: dict) -> dict:
         return res
 
     if key == "sanrentan":
-        res["stake"] = UNIT
-        nums = list(bet.get("nums") or [])
-        for row in payouts.get("trifecta", []):
-            if row["combo"] == nums:          # 1→2→3 着順どおり
-                res["hit"] = True
-                res["ret"] = row["yen"]
+        combos = [list(c) for c in bet.get("combos", [])]
+        if not combos and bet.get("nums"):          # 旧形式(単点)フォールバック
+            combos = [list(bet["nums"])]
+        res["stake"] = len(combos) * UNIT
+        rows = payouts.get("trifecta", [])
+        actual = list(top3)                          # [1着, 2着, 3着]
+        if any(c == actual for c in combos):
+            res["hit"] = True
+            res["ret"] = rows[0]["yen"] if rows else 0
         return res
 
-    if key in ("sanrenpuku_formation", "sanrenpuku_nagashi"):
-        if key == "sanrenpuku_formation":
+    if key in ("sanrenpuku", "sanrenpuku_formation", "sanrenpuku_nagashi"):
+        if bet.get("combos"):
             combos = {frozenset(c) for c in bet["combos"]}
-        else:
+        elif bet.get("partners"):                    # 旧・軸1頭ながし形式
             axis, partners = bet["axis"][0], bet["partners"]
             combos = {frozenset((axis, a, b))
                       for i, a in enumerate(partners) for b in partners[i + 1:]}
+        else:
+            combos = set()
         res["stake"] = len(combos) * UNIT
         rows = payouts.get("trio", [])
         if len(top3_set) == 3 and frozenset(top3_set) in combos:

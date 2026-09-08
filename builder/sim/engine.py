@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from itertools import combinations
 
 import numpy as np
 
@@ -123,7 +124,7 @@ def simulate(race: Race, n_sims: int = 10000, seed: int = 12345,
         hh["rank"] = r
 
     col = {int(nums[i]): i for i in range(H)}
-    recommended = _recommended(pos, horses, col, nums)
+    recommended = _recommended(pos, horses, col, nums, confidence)
     animation = build_animation(race, models, horses, pace_press, rng)
 
     # 買い目チェッカー用: 各試行の上位3頭 (馬番)
@@ -152,8 +153,31 @@ def simulate(race: Race, n_sims: int = 10000, seed: int = 12345,
 
 
 # --------------------------------------------------------------------- 推奨買い目
+def _trio_combos(method: str, r: list[int]) -> list[tuple[int, int, int]]:
+    """3連複の買い目。method="流し": r[0] 軸 + r[1:6] から2頭 / "フォーメーション": 上位5頭の
+    3頭組で r[0] か r[1] を含むもの。"""
+    if method == "流し":
+        axis, partners = r[0], r[1:6]
+        return sorted({tuple(sorted((axis, a, b)))
+                       for i, a in enumerate(partners) for b in partners[i + 1:]})
+    top5 = r[:5]
+    return sorted({tuple(sorted(c)) for c in combinations(top5, 3)
+                   if r[0] in c or r[1] in c})
+
+
+def _trifecta_combos(method: str, r: list[int]) -> list[tuple[int, int, int]]:
+    """3連単の買い目 (着順あり)。method="流し": 1着 r[0] 固定・2,3着を r[1:5] から /
+    "フォーメーション": 1着[r0,r1] 2着[r0,r1,r2] 3着[r0,r1,r2,r3]。"""
+    if method == "流し":
+        first, rest = r[0], r[1:5]
+        return [(first, a, b) for a in rest for b in rest if a != b]
+    firsts, secs, thirds = [r[0], r[1]], [r[0], r[1], r[2]], [r[0], r[1], r[2], r[3]]
+    out = {(a, b, c) for a in firsts for b in secs for c in thirds if len({a, b, c}) == 3}
+    return sorted(out)
+
+
 def _recommended(pos: np.ndarray, horses: list[dict], col: dict[int, int],
-                 nums: np.ndarray) -> list[dict]:
+                 nums: np.ndarray, confidence: float) -> list[dict]:
     ranked = [h["num"] for h in horses]
     out: list[dict] = []
 
@@ -192,41 +216,40 @@ def _recommended(pos: np.ndarray, horses: list[dict], col: dict[int, int],
              "hit_prob": round(prob((pos[:, c(r1)] <= 3) & (pos[:, c(o)] <= 3)), 4),
              "note": "2頭とも3着以内"})
 
-    # 3連複フォーメーション  1列:{r1} 2列:{r2,r3,r4} 3列:{r2..r6}
-    row_a, row_b, row_c = [r1], [r2, r3, r4], [r2, r3, r4, r5, r6]
-    combos = set()
-    for a in row_a:
-        for b in row_b:
-            for cc in row_c:
-                s = frozenset((a, b, cc))
-                if len(s) == 3:
-                    combos.add(s)
-    combos = sorted(tuple(sorted(s)) for s in combos)
-    top3_nums = np.stack([nums[(pos == k).argmax(axis=1)] for k in (1, 2, 3)], axis=1)
-    top3_set = np.sort(top3_nums, axis=1)
-    combo_arr = np.array(combos)
-    hitf = _any_set_match(top3_set, combo_arr)
-    add({"key": "sanrenpuku_formation", "type": "3連複フォーメーション", "tracked": True,
-         "selection": f"{row_a[0]} - [{','.join(map(str, row_b))}] - [{','.join(map(str, row_c))}]",
-         "rows": [row_a, row_b, row_c], "combos": [list(x) for x in combos], "unit": len(combos),
-         "hit_prob": round(prob(hitf), 4),
-         "note": f"{len(combos)}点 (計{len(combos) * 100}円)。上位3頭のいずれかの組合せが的中"})
+    # --- 3連複 / 3連単: 軸のはっきり度で「流し」か「フォーメーション」を都度判断 ---
+    r6list = [r1, r2, r3, r4, r5, r6]
+    method = "流し" if confidence >= 0.24 else "フォーメーション"
 
-    # 3連複 軸1頭ながし  軸:r1  相手:{r2..r6}
-    partners = [x for x in dict.fromkeys([r2, r3, r4, r5, r6]) if x != r1]
-    ncombo = np.stack([pos[:, c(p)] <= 3 for p in partners], axis=1).sum(axis=1)
-    hitn = (pos[:, c(r1)] <= 3) & (ncombo >= 2)
-    add({"key": "sanrenpuku_nagashi", "type": "3連複 軸1頭ながし", "tracked": False,
-         "selection": f"{r1} 軸 → {'・'.join(map(str, partners))}",
-         "axis": [r1], "partners": partners, "unit": len(partners) * (len(partners) - 1) // 2,
-         "hit_prob": round(prob(hitn), 4),
-         "note": f"{len(partners) * (len(partners) - 1) // 2}点。軸が3着以内かつ相手2頭も3着以内"})
+    top3_ord = np.stack([nums[(pos == k).argmax(axis=1)] for k in (1, 2, 3)], axis=1)  # (n,3) 着順
+    top3_set = np.sort(top3_ord, axis=1)
 
-    add({"key": "sanrentan", "type": "3連単", "tracked": True,
-         "selection": f"{r1} → {r2} → {r3}", "nums": [r1, r2, r3], "unit": 1,
-         "hit_prob": round(prob((pos[:, c(r1)] == 1) & (pos[:, c(r2)] == 2) & (pos[:, c(r3)] == 3)), 4),
-         "note": "1→2→3着を着順どおり (1点100円)"})
+    trio = _trio_combos(method, r6list)
+    trio_hit = _any_set_match(top3_set, np.sort(np.array(trio), axis=1))
+    add({"key": "sanrenpuku", "type": "3連複", "method": method, "tracked": True,
+         "selection": _combo_label("3連複", method, r6list),
+         "combos": [list(x) for x in trio], "unit": len(trio),
+         "hit_prob": round(prob(trio_hit), 4),
+         "note": f"{method}・{len(trio)}点（計{len(trio) * 100}円）。上位陣の3頭が的中"})
+
+    tri = _trifecta_combos(method, r6list)
+    tri_arr = np.array(tri)
+    tri_hit = (top3_ord[:, None, :] == tri_arr[None, :, :]).all(axis=2).any(axis=1)
+    add({"key": "sanrentan", "type": "3連単", "method": method, "tracked": True,
+         "selection": _combo_label("3連単", method, r6list),
+         "combos": [list(x) for x in tri], "unit": len(tri),
+         "hit_prob": round(prob(tri_hit), 4),
+         "note": f"{method}・{len(tri)}点（計{len(tri) * 100}円）。1→2→3着を着順どおり"})
     return out
+
+
+def _combo_label(kind: str, method: str, r: list[int]) -> str:
+    if method == "流し":
+        rest = "・".join(map(str, r[1:5]))
+        return (f"{r[0]} 流し → {rest}" if kind == "3連単"
+                else f"{r[0]} 軸 → {'・'.join(map(str, r[1:6]))}")
+    if kind == "3連単":
+        return f"[{r[0]},{r[1]}] → [{r[0]},{r[1]},{r[2]}] → [{r[0]},{r[1]},{r[2]},{r[3]}]"
+    return f"上位5頭（{'・'.join(map(str, r[:5]))}）から3頭・{r[0]}か{r[1]}を含む"
 
 
 def _podium_col(pos: np.ndarray, k: int) -> np.ndarray:

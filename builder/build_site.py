@@ -207,6 +207,12 @@ def main() -> None:
     dates = args.dates or resolve_target_dates()
     payload = run(dates, limit=args.limit or s.max_races, out_dir=out)
     render_site(out, payload)
+    try:
+        from builder.publish import generate as gen_announcements
+
+        gen_announcements(out, payload)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("announcements 生成に失敗: %s", exc)
     log.info("生成完了: %d レース -> %s", len(payload["races"]), out)
 
 
