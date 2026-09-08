@@ -175,6 +175,21 @@ def _x_creds() -> tuple[str, str, str, str] | None:
     return tuple(vals) if all(vals) else None  # type: ignore
 
 
+def verify_x() -> dict:
+    """認証情報の疎通確認 (GET /2/users/me)。投稿はしない。"""
+    creds = _x_creds()
+    if not creds:
+        return {"ok": False, "reason": "認証情報 (X_API_KEY 等4つ) が未設定"}
+    ck, cs, at, ats = creds
+    url = "https://api.twitter.com/2/users/me"
+    hdr = _oauth1_header("GET", url, ck, cs, at, ats)
+    r = httpx.get(url, headers={"Authorization": hdr}, timeout=20)
+    if r.status_code != 200:
+        return {"ok": False, "status": r.status_code, "body": r.text[:300]}
+    data = r.json().get("data", {})
+    return {"ok": True, "username": data.get("username"), "id": data.get("id")}
+
+
 def post_x_thread(segments: list[str]) -> list[str]:
     """スレッドを順に投稿。tweet id のリストを返す。認証情報が無ければ空リスト。"""
     creds = _x_creds()
@@ -284,21 +299,22 @@ def _write_announce_page(out_dir: Path, sections: list) -> None:
     (out_dir / "announce.html").write_text(html, encoding="utf-8")
 
 
-def post_x(out_dir: Path, payload: dict, *, force: bool = False) -> dict:
+def post_x(out_dir: Path, payload: dict, *, force: bool = False,
+           date: str | None = None) -> dict:
     now = datetime.now(JST)
     if not force and not (X_POST_HOURS[0] <= now.hour < X_POST_HOURS[1]):
         log.info("X 投稿時間帯外 (JST %d時) のためスキップ", now.hour)
         return {"posted": None}
-    today = now.strftime("%Y-%m-%d")
+    today = date or now.strftime("%Y-%m-%d")
     races_today = _races_by_date(payload).get(today, [])
     att = _day_attention(races_today)
     if not att:
-        log.info("本日 %s のレースが無いため投稿しない", today)
+        log.info("%s のレースが無いため投稿しない", today)
         return {"posted": None}
 
     state = _load_state()
     if today in state.get("x_posted", []) and not force:
-        log.info("本日 %s は投稿済み", today)
+        log.info("%s は投稿済み", today)
         return {"posted": None}
 
     note_url = os.environ.get("NOTE_URL", NOTE_URL_DEFAULT)
@@ -327,16 +343,22 @@ def _load_payload(out_dir: Path) -> dict:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["generate", "post-x"])
+    ap.add_argument("cmd", choices=["generate", "post-x", "verify"])
     ap.add_argument("--out", default="./public")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--date", default=None, help="post-x で投稿する開催日 (YYYY-MM-DD)")
     args = ap.parse_args()
+
+    if args.cmd == "verify":
+        log.info("verify: %s", verify_x())
+        return
+
     out = Path(args.out)
     payload = _load_payload(out)
     if args.cmd == "generate":
         generate(out, payload)
     else:
-        r = post_x(out, payload, force=args.force)
+        r = post_x(out, payload, force=args.force, date=args.date)
         log.info("post-x: %s", r)
 
 

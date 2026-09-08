@@ -1,0 +1,53 @@
+name: x-post (manual)
+
+# X 連携の手動確認・臨時投稿。
+#  mode=verify : 認証情報の疎通確認のみ (投稿しない)
+#  mode=post   : 指定日の注目レースを実際に投稿 (date 必須)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "verify (疎通確認のみ) / post (実投稿)"
+        type: choice
+        options: [verify, post]
+        default: verify
+      date:
+        description: "mode=post のとき投稿する開催日 YYYY-MM-DD"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  x:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      X_API_KEY: ${{ secrets.X_API_KEY }}
+      X_API_SECRET: ${{ secrets.X_API_SECRET }}
+      X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+      X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+      NOTE_URL: ${{ secrets.NOTE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Verify
+        if: ${{ inputs.mode == 'verify' }}
+        run: python -m builder.publish verify
+      - name: Post
+        if: ${{ inputs.mode == 'post' }}
+        run: python -m builder.publish post-x --out public --force --date "${{ inputs.date }}"
+      - name: Commit state
+        if: ${{ inputs.mode == 'post' }}
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add builder/model/state
+          git commit -m "x-post: manual $(date -u +%FT%TZ)" || echo "no changes"
+          git pull --rebase --autostash || true
+          git push
