@@ -216,16 +216,16 @@ def _recommended(pos: np.ndarray, horses: list[dict], col: dict[int, int],
     partners = [x for x in dict.fromkeys([r2, r3, r4, r5, r6]) if x != r1]
     ncombo = np.stack([pos[:, c(p)] <= 3 for p in partners], axis=1).sum(axis=1)
     hitn = (pos[:, c(r1)] <= 3) & (ncombo >= 2)
-    add({"key": "sanrenpuku_nagashi", "type": "3連複 軸1頭ながし", "tracked": True,
+    add({"key": "sanrenpuku_nagashi", "type": "3連複 軸1頭ながし", "tracked": False,
          "selection": f"{r1} 軸 → {'・'.join(map(str, partners))}",
          "axis": [r1], "partners": partners, "unit": len(partners) * (len(partners) - 1) // 2,
          "hit_prob": round(prob(hitn), 4),
          "note": f"{len(partners) * (len(partners) - 1) // 2}点。軸が3着以内かつ相手2頭も3着以内"})
 
-    add({"key": "sanrentan", "type": "3連単", "tracked": False,
+    add({"key": "sanrentan", "type": "3連単", "tracked": True,
          "selection": f"{r1} → {r2} → {r3}", "nums": [r1, r2, r3], "unit": 1,
          "hit_prob": round(prob((pos[:, c(r1)] == 1) & (pos[:, c(r2)] == 2) & (pos[:, c(r3)] == 3)), 4),
-         "note": "1→2→3着を着順どおり (1点)"})
+         "note": "1→2→3着を着順どおり (1点100円)"})
     return out
 
 

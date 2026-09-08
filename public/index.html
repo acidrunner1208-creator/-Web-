@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>レース予測 — 競馬シミュレーター</title>
-  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="/assets/app.css?v=e21f2d72">
 </head>
 <body>
 <header class="site-header">
@@ -27,9 +27,11 @@
 <section class="card roi">
   <h2>推奨買い目の成績</h2>
   <p class="muted">
-    アプリが推奨した「単勝」「3連複フォーメーション」「3連複 軸1頭ながし」を、
-    毎レース 1 点 100 円ずつ購入したと仮定した実績（運用開始 2026-09-08 以降）。
+    アプリが推奨した買い目を、毎レース各 1 点あたり 100 円で購入したと仮定した実績
+    （運用開始 2026-09-08 以降）。3連複フォーメーションは点数ぶん購入。
   </p>
+
+  <h3>全体（0R・的中 0R）</h3>
   <div class="roi-headline">
     <div class="roi-big">
       <span>累計利益率</span>
@@ -43,10 +45,68 @@
       <div><span>回収率</span>0.0%</div>
       <div><span>購入額</span>0円</div>
       <div><span>払戻</span>0円</div>
-      <div><span>対象</span>0R（的中 0R）</div>
     </div>
   </div>
-    <p class="muted">まだ結果の出たレースがありません。レースが終わるたびに自動で集計・グラフ化されます。</p>
+
+    <p class="muted">まだ結果の出たレースがありません。レースが終わるたびに、買い目ごとに自動で集計・グラフ化されます。</p>
+
+  <div class="roi-type">
+    <h3>単勝</h3>
+    <div class="roi-headline">
+      <div class="roi-big">
+        <span>利益率</span>
+        <b class="pos">+0.0%</b>
+      </div>
+      <div class="roi-big">
+        <span>利益額</span>
+        <b class="pos">+0円</b>
+      </div>
+      <div class="roi-sub">
+        <div><span>回収率</span>0.0%</div>
+        <div><span>購入額</span>0円</div>
+        <div><span>払戻</span>0円</div>
+        <div><span>的中</span>0/0R</div>
+      </div>
+    </div>
+  </div>
+  <div class="roi-type">
+    <h3>3連複フォーメーション</h3>
+    <div class="roi-headline">
+      <div class="roi-big">
+        <span>利益率</span>
+        <b class="pos">+0.0%</b>
+      </div>
+      <div class="roi-big">
+        <span>利益額</span>
+        <b class="pos">+0円</b>
+      </div>
+      <div class="roi-sub">
+        <div><span>回収率</span>0.0%</div>
+        <div><span>購入額</span>0円</div>
+        <div><span>払戻</span>0円</div>
+        <div><span>的中</span>0/0R</div>
+      </div>
+    </div>
+  </div>
+  <div class="roi-type">
+    <h3>3連単</h3>
+    <div class="roi-headline">
+      <div class="roi-big">
+        <span>利益率</span>
+        <b class="pos">+0.0%</b>
+      </div>
+      <div class="roi-big">
+        <span>利益額</span>
+        <b class="pos">+0円</b>
+      </div>
+      <div class="roi-sub">
+        <div><span>回収率</span>0.0%</div>
+        <div><span>購入額</span>0円</div>
+        <div><span>払戻</span>0円</div>
+        <div><span>的中</span>0/0R</div>
+      </div>
+    </div>
+  </div>
 </section>
 
 
@@ -272,7 +332,7 @@
 
 <footer class="site-footer wrap">
   <p>
-    データ生成: 2026-09-07 23:54 UTC ／ 対象: 2026-09-12 ・ 2026-09-13
+    データ生成: 2026-09-08 00:01 UTC ／ 対象: 2026-09-12 ・ 2026-09-13
   </p>
   <p class="disclaimer">
     本アプリは過去データに基づく統計的シミュレーションであり、的中を保証しません。

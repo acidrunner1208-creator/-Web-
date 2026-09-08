@@ -34,6 +34,30 @@ def test_roi_headline_computes_rate_and_filters_by_launch(monkeypatch):
     assert len(h["series"]) == 3 and h["series"][0] == 0.0
 
 
+def test_roi_headline_by_bet_type(monkeypatch):
+    monkeypatch.setattr(render, "LAUNCH_DATE", "2026-09-08")
+    ledger = {"entries": [
+        {"date": "2026-09-13", "stake": 300, "ret": 480, "profit": 180, "bets": [
+            {"key": "tansho", "stake": 100, "ret": 480},
+            {"key": "sanrenpuku_formation", "stake": 100, "ret": 0},
+            {"key": "sanrentan", "stake": 100, "ret": 0},
+        ]},
+        {"date": "2026-09-14", "stake": 300, "ret": 5000, "profit": 4700, "bets": [
+            {"key": "tansho", "stake": 100, "ret": 0},
+            {"key": "sanrenpuku_formation", "stake": 100, "ret": 0},
+            {"key": "sanrentan", "stake": 100, "ret": 5000},
+        ]},
+    ]}
+    h = roi_headline(ledger)
+    types = {t["key"]: t for t in h["by_type"]}
+    assert [t["key"] for t in h["by_type"]] == ["tansho", "sanrenpuku_formation", "sanrentan"]
+    assert types["tansho"]["profit"] == 480 - 200
+    assert types["sanrentan"]["profit"] == 5000 - 200
+    assert types["sanrenpuku_formation"]["profit"] == -200
+    assert types["sanrentan"]["hit_races"] == 1
+    assert len(types["tansho"]["series"]) == 3
+
+
 def _fake_race(seed=0):
     """線形に分離可能なダミーレース: 特徴量1が高い馬が勝ちやすい。"""
     rng = np.random.default_rng(seed)
@@ -93,4 +117,14 @@ def test_settle_tansho_and_trio():
     assert nag["hit"] and nag["ret"] == 2610
 
     miss = _settle_bet({"key": "tansho", "type": "単勝", "axis": [1]}, top3, payouts)
+    assert not miss["hit"] and miss["ret"] == 0
+
+
+def test_settle_sanrentan():
+    payouts = {"trifecta": [{"combo": [7, 4, 10], "yen": 18230, "pop": 42}]}
+    top3 = [7, 4, 10]
+    hit = _settle_bet({"key": "sanrentan", "type": "3連単", "nums": [7, 4, 10]}, top3, payouts)
+    assert hit["hit"] and hit["ret"] == 18230 and hit["stake"] == 100
+    # 着順違いは外れ
+    miss = _settle_bet({"key": "sanrentan", "type": "3連単", "nums": [4, 7, 10]}, top3, payouts)
     assert not miss["hit"] and miss["ret"] == 0

@@ -189,6 +189,6 @@
 window.__RACE_ANIM__ = {{ r.animation | tojson }};
 window.__RACE__ = {{ {"horses": r.horses | map(attribute="num") | list, "names": r.horses | map(attribute="name") | list, "podium": r.podium, "podium_n": r.podium_n} | tojson }};
 </script>
-<script src="/assets/race-anim.js"></script>
-<script src="/assets/bet-check.js"></script>
+<script src="/assets/race-anim.js?v={{ meta.asset_ver }}"></script>
+<script src="/assets/bet-check.js?v={{ meta.asset_ver }}"></script>
 {% endblock %}

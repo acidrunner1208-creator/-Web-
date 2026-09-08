@@ -20,6 +20,9 @@ concurrency:
   group: train
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   train:
     runs-on: ubuntu-latest

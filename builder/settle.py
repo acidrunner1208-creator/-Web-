@@ -54,6 +54,15 @@ def _settle_bet(bet: dict, top3: list[int], payouts: dict) -> dict:
                 res["ret"] = row["yen"]
         return res
 
+    if key == "sanrentan":
+        res["stake"] = UNIT
+        nums = list(bet.get("nums") or [])
+        for row in payouts.get("trifecta", []):
+            if row["combo"] == nums:          # 1→2→3 着順どおり
+                res["hit"] = True
+                res["ret"] = row["yen"]
+        return res
+
     if key in ("sanrenpuku_formation", "sanrenpuku_nagashi"):
         if key == "sanrenpuku_formation":
             combos = {frozenset(c) for c in bet["combos"]}

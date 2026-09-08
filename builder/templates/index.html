@@ -8,9 +8,11 @@
 <section class="card roi">
   <h2>推奨買い目の成績</h2>
   <p class="muted">
-    アプリが推奨した「単勝」「3連複フォーメーション」「3連複 軸1頭ながし」を、
-    毎レース 1 点 100 円ずつ購入したと仮定した実績（運用開始 {{ roi.since }} 以降）。
+    アプリが推奨した買い目を、毎レース各 1 点あたり 100 円で購入したと仮定した実績
+    （運用開始 {{ roi.since }} 以降）。3連複フォーメーションは点数ぶん購入。
   </p>
+
+  <h3>全体（{{ roi.races }}R・的中 {{ roi.hit_races }}R）</h3>
   <div class="roi-headline">
     <div class="roi-big">
       <span>累計利益率</span>
@@ -24,15 +26,35 @@
       <div><span>回収率</span>{{ roi.recovery_rate }}%</div>
       <div><span>購入額</span>{{ roi.stake | yen }}円</div>
       <div><span>払戻</span>{{ roi.ret | yen }}円</div>
-      <div><span>対象</span>{{ roi.races }}R（的中 {{ roi.hit_races }}R）</div>
     </div>
   </div>
-  {% if roi.races >= 1 %}
-    <h3>累計利益率の推移</h3>
-    {{ roi.chart | safe }}
-  {% else %}
-    <p class="muted">まだ結果の出たレースがありません。レースが終わるたびに自動で集計・グラフ化されます。</p>
+
+  {% if roi.races < 1 %}
+    <p class="muted">まだ結果の出たレースがありません。レースが終わるたびに、買い目ごとに自動で集計・グラフ化されます。</p>
   {% endif %}
+
+  {% for t in roi.by_type %}
+  <div class="roi-type">
+    <h3>{{ t.label }}</h3>
+    <div class="roi-headline">
+      <div class="roi-big">
+        <span>利益率</span>
+        <b class="{{ 'pos' if t.profit_rate >= 0 else 'neg' }}">{{ '%+.1f' | format(t.profit_rate) }}%</b>
+      </div>
+      <div class="roi-big">
+        <span>利益額</span>
+        <b class="{{ 'pos' if t.profit >= 0 else 'neg' }}">{{ '%+d' | format(t.profit) }}円</b>
+      </div>
+      <div class="roi-sub">
+        <div><span>回収率</span>{{ t.recovery_rate }}%</div>
+        <div><span>購入額</span>{{ t.stake | yen }}円</div>
+        <div><span>払戻</span>{{ t.ret | yen }}円</div>
+        <div><span>的中</span>{{ t.hit_races }}/{{ t.races }}R</div>
+      </div>
+    </div>
+    {% if t.races >= 1 %}{{ t.chart | safe }}{% endif %}
+  </div>
+  {% endfor %}
   {% if ledger and ledger.entries %}
   <details class="ledger-detail">
     <summary>レース別の履歴</summary>

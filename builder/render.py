@@ -1,6 +1,7 @@
 """シミュレーション結果 -> 静的 HTML / JSON 生成。"""
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from datetime import date, datetime, timezone
@@ -162,33 +163,54 @@ def line_chart_svg(points: list[float], width: int = 640, height: int = 220,
 
 LAUNCH_DATE = "2026-09-08"   # この日以降のレースを「運用開始からの成績」として集計
 
+# 成績を集計・グラフ化する買い目 (キー, 表示名) — 表示順
+TRACKED_BETS = [
+    ("tansho", "単勝"),
+    ("sanrenpuku_formation", "3連複フォーメーション"),
+    ("sanrentan", "3連単"),
+]
 
-def roi_headline(ledger: dict) -> dict:
-    """運用開始日以降の累計成績。空でも 0 を返す (ホームに常時表示するため)。"""
-    entries = [e for e in ledger.get("entries", []) if e.get("date", "") >= LAUNCH_DATE]
-    stake = sum(e["stake"] for e in entries)
-    ret = sum(e["ret"] for e in entries)
-    hit = sum(1 for e in entries if e["profit"] > 0)
-    rate = (ret - stake) / stake * 100 if stake else 0.0
-    # 累積利益率(%) の推移
+
+def _tally(rows: list[tuple[int, int]]) -> dict:
+    """rows: [(stake, ret), ...] を時系列で累積して指標＋累積利益率(%)系列を返す。"""
+    stake = sum(s for s, _ in rows)
+    ret = sum(r for _, r in rows)
+    hit = sum(1 for s, r in rows if r > s)
     cs = cr = 0
     series = [0.0]
-    for e in entries:
-        cs += e["stake"]
-        cr += e["ret"]
+    for s, r in rows:
+        cs += s
+        cr += r
         series.append((cr - cs) / cs * 100 if cs else 0.0)
     return {
-        "since": LAUNCH_DATE,
-        "races": len(entries),
+        "races": len(rows),
         "hit_races": hit,
         "stake": stake,
         "ret": ret,
         "profit": ret - stake,
-        "profit_rate": round(rate, 1),
+        "profit_rate": round((ret - stake) / stake * 100, 1) if stake else 0.0,
         "recovery_rate": round(ret / stake * 100, 1) if stake else 0.0,
         "series": series,
         "chart": line_chart_svg(series, mode="pct") if len(series) >= 2 else "",
     }
+
+
+def roi_headline(ledger: dict) -> dict:
+    """運用開始日以降の累計成績＋買い目別内訳。空でも 0 を返す (ホームに常時表示)。"""
+    entries = [e for e in ledger.get("entries", []) if e.get("date", "") >= LAUNCH_DATE]
+
+    overall = _tally([(e["stake"], e["ret"]) for e in entries])
+
+    by_type = []
+    for key, label in TRACKED_BETS:
+        rows = []
+        for e in entries:
+            b = next((x for x in e.get("bets", []) if x.get("key") == key), None)
+            if b:
+                rows.append((b["stake"], b["ret"]))
+        by_type.append({"key": key, "label": label, **_tally(rows)})
+
+    return {"since": LAUNCH_DATE, **overall, "by_type": by_type}
 
 
 env.filters["pct"] = _pct
@@ -232,14 +254,17 @@ def render_site(out_dir: Path, payload: dict) -> None:
 
     assets_out = out_dir / "assets"
     assets_out.mkdir(exist_ok=True)
+    digest = hashlib.sha1()
     if _ASSET_SRC.exists():
-        for f in _ASSET_SRC.iterdir():
+        for f in sorted(_ASSET_SRC.iterdir()):
             if f.is_file():
                 shutil.copy2(f, assets_out / f.name)
+                digest.update(f.read_bytes())
 
     races = payload["races"]
     meta = {k: payload[k] for k in ("dates", "generated_at", "demo_mode", "n_sims", "note")}
     meta["model_state"] = payload.get("model_state", {"trained": False, "n_races": 0})
+    meta["asset_ver"] = digest.hexdigest()[:8]   # アセット更新時のキャッシュ破棄用
 
     ledger = {}
     lp = out_dir / "data" / "ledger.json"
