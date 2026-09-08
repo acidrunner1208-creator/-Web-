@@ -299,8 +299,15 @@ def _write_announce_page(out_dir: Path, sections: list) -> None:
     (out_dir / "announce.html").write_text(html, encoding="utf-8")
 
 
+def _x_enabled() -> bool:
+    return os.environ.get("X_POST_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def post_x(out_dir: Path, payload: dict, *, force: bool = False,
            date: str | None = None) -> dict:
+    if not force and not _x_enabled():
+        log.info("X 自動投稿は無効 (Secret X_POST_ENABLED が未設定)。本文生成のみ。")
+        return {"posted": None}
     now = datetime.now(JST)
     if not force and not (X_POST_HOURS[0] <= now.hour < X_POST_HOURS[1]):
         log.info("X 投稿時間帯外 (JST %d時) のためスキップ", now.hour)

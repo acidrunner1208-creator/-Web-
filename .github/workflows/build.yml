@@ -61,6 +61,7 @@ jobs:
       - name: Post race-day preview to X
         continue-on-error: true
         env:
+          X_POST_ENABLED: ${{ secrets.X_POST_ENABLED }}   # "1" にしたときだけ実投稿
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}

@@ -47,7 +47,9 @@ Web 側は一切スクレイピング・計算をしません。単勝オッズ�
   有料 note で公開中（¥300）」を返信でぶら下げる。
   投稿には X API v2 の OAuth 1.0a 認証情報が必要（GitHub Secrets）:
   `X_API_KEY` `X_API_SECRET` `X_ACCESS_TOKEN` `X_ACCESS_SECRET`。
-  未設定なら本文生成のみ（投稿しない）。
+  さらに **`X_POST_ENABLED` を `1` にしたときだけ実投稿**（キル
+  スイッチ。未設定なら本文生成のみ）。手動の `x-post` ワークフロー
+  （mode=post）は `X_POST_ENABLED` に関係なく投稿する。
 - **note**：その日の全レース（1R〜12R）を1記事にまとめた本文を生成。note は
   投稿 API が無いため、本文は Basic 認証つきの **`/announce.html`** に置かれる。
   そこからコピーして note.com で ¥300 記事として公開する。記事 URL が決まったら

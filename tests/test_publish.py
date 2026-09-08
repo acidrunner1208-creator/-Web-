@@ -59,6 +59,14 @@ def test_note_markdown_has_all_races_and_fields():
         assert token in md
 
 
+def test_post_x_disabled_without_flag(monkeypatch, tmp_path):
+    from builder.publish import post_x
+
+    monkeypatch.delenv("X_POST_ENABLED", raising=False)
+    r = post_x(tmp_path, _payload())
+    assert r == {"posted": None}
+
+
 def test_oauth1_header_shape():
     h = _oauth1_header("POST", "https://api.twitter.com/2/tweets",
                        "ck", "cs", "at", "ats")
