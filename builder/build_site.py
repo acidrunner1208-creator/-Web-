@@ -96,14 +96,20 @@ def build_race_payload(race: Race, n_sims: int, workouts: dict | None = None) ->
     }
 
 
-def _archive_recommended(out_dir: Path, r: dict) -> None:
-    """settle 用に推奨買い目を恒久保存 (レース詳細JSONが window から外れても残す)。"""
+def _archive_recommended(out_dir: Path, r: dict, *, attention: bool) -> None:
+    """settle 用に推奨買い目を恒久保存 (レース詳細JSONが window から外れても残す)。
+
+    attention: このレースが「レース発走前の最終更新時点」で注目レース TOP3 に
+    入っていたかどうか。settle はこれが True のレースのみを成績に反映する
+    (= アプリが実際に強く推した予想だけを成績として記録する)。
+    """
     d = out_dir / "data" / "recommended"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{r['race_id']}.json").write_text(
         json.dumps({
             "race_id": r["race_id"], "kaisai_date": r["kaisai_date"], "venue": r["venue"],
             "race_number": r["race_number"], "race_name": r["race_name"],
+            "confidence": r.get("confidence"), "attention": attention,
             "recommended": [b for b in r["recommended"] if b.get("tracked")],
         }, ensure_ascii=False), encoding="utf-8",
     )
@@ -146,7 +152,6 @@ def run(dates: list[str], limit: int | None = None, out_dir: Path | None = None)
                 if not payload["horses"]:
                     continue
                 races_out.append(payload)
-                _archive_recommended(out_dir, payload)
                 done += 1
                 log.info("  %s%sR %s ✓ (conf=%.2f, %s)", race.venue or "", race.race_number or "",
                          race.race_name or "", payload["confidence"], payload["model"])
@@ -162,6 +167,9 @@ def run(dates: list[str], limit: int | None = None, out_dir: Path | None = None)
 
     races_out.sort(key=lambda r: (r["kaisai_date"] or "", r["venue"] or "", r["race_number"] or 0))
     attention = sorted(races_out, key=lambda r: r["confidence"], reverse=True)[:3]
+    attention_ids = {a["race_id"] for a in attention}
+    for r in races_out:
+        _archive_recommended(out_dir, r, attention=r["race_id"] in attention_ids)
 
     groups: dict[tuple, list] = {}
     for r in races_out:

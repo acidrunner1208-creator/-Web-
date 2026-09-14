@@ -46,18 +46,22 @@
   }
 
   // ---- 買い目チェッカー ----
+  // 単勝〜ワイドは1つの馬番リストから選ぶ「フラット」型。
+  // 3連複・3連単は 1〜3着それぞれの候補馬グループを選ぶ「フォーメーション」型のみに統一
+  // (ボックス・軸1頭流しは廃止)。
   var TYPES = {
-    tansho:   { pick: [1, 1],  axis: false, label: "1着になる馬を1頭" },
-    fukusho:  { pick: [1, 1],  axis: false, label: "3着以内に入る馬を1頭" },
-    umaren:   { pick: [2, 2],  axis: false, label: "1・2着の2頭 (順不同)" },
-    wide:     { pick: [2, 8],  axis: false, label: "3着以内に入る馬を2頭以上 (ボックス)" },
-    umatan:   { pick: [2, 2],  axis: false, label: "1・2着の2頭 (両方向)" },
-    sanrenpuku: { pick: [3, 10], axis: false, label: "3着以内の3頭を含む組合せ (ボックス)" },
-    sanrenpuku_nagashi: { pick: [3, 9], axis: true, label: "軸1頭 + 相手2頭以上" },
-    sanrentan: { pick: [3, 8], axis: false, label: "1〜3着に入る馬 (ボックス)" },
+    tansho:   { kind: "flat", pick: [1, 1], label: "1着になる馬を1頭" },
+    fukusho:  { kind: "flat", pick: [1, 1], label: "3着以内に入る馬を1頭" },
+    umaren:   { kind: "flat", pick: [2, 2], label: "1・2着の2頭 (順不同)" },
+    wide:     { kind: "flat", pick: [2, 8], label: "3着以内に入る馬を2頭以上 (ボックス)" },
+    umatan:   { kind: "flat", pick: [2, 2], label: "1・2着の2頭 (着順どおり)" },
+    sanrenpuku: { kind: "formation", ordered: false,
+      label: "1〜3着それぞれの候補馬を選択（同じ馬を複数列に入れても可・順不同で的中判定）" },
+    sanrentan: { kind: "formation", ordered: true,
+      label: "1〜3着それぞれの候補馬を選択（同じ馬を複数列に入れても可・着順どおりで的中判定）" },
   };
 
-  function hitRate(type, picks, axis) {
+  function hitRateFlat(type, picks) {
     var set = new Set(picks);
     var c = 0;
     for (var k = 0; k < samples.length; k++) {
@@ -67,26 +71,51 @@
       else if (type === "umaren") ok = (a[0] === picks[0] || a[0] === picks[1]) && (a[1] === picks[0] || a[1] === picks[1]);
       else if (type === "umatan") ok = (a[0] === picks[0] && a[1] === picks[1]) || (a[0] === picks[1] && a[1] === picks[0]);
       else if (type === "wide") { var n = 0; picks.forEach(function (p) { if (s.has(p)) n++; }); ok = n >= 2; }
-      else if (type === "sanrenpuku") ok = s.has(a[0]) && s.has(a[1]) && s.has(a[2]) && set.has(a[0]) && set.has(a[1]) && set.has(a[2]);
-      else if (type === "sanrentan") ok = set.has(a[0]) && set.has(a[1]) && set.has(a[2]);
-      else if (type === "sanrenpuku_nagashi") {
-        if (!s.has(axis)) ok = false;
-        else { var m = 0; picks.forEach(function (p) { if (p !== axis && s.has(p)) m++; }); ok = m >= 2; }
-      }
       if (ok) c++;
     }
     return c / NS;
   }
 
-  function points(type, k, axisSet) {
+  function pointsFlat(type, k) {
     if (type === "tansho" || type === "fukusho") return k >= 1 ? 1 : 0;
     if (type === "umaren") return k === 2 ? 1 : 0;
     if (type === "umatan") return k === 2 ? 2 : 0;
     if (type === "wide") return comb(k, 2);
-    if (type === "sanrenpuku") return comb(k, 3);
-    if (type === "sanrentan") return k * (k - 1) * (k - 2);
-    if (type === "sanrenpuku_nagashi") return comb(Math.max(k - 1, 0), 2);
     return 0;
+  }
+
+  // フォーメーション買い目の組合せ生成: g1/g2/g3 は各列で選んだ馬番の配列。
+  // 3頭とも異なる馬になる組だけを採用。ordered=false (3連複) は重複組を除去。
+  function formationCombos(g1, g2, g3, ordered) {
+    var out = [], seen = ordered ? null : {};
+    g1.forEach(function (a) {
+      g2.forEach(function (b) {
+        if (b === a) return;
+        g3.forEach(function (c) {
+          if (c === a || c === b) return;
+          if (ordered) { out.push([a, b, c]); return; }
+          var key = [a, b, c].slice().sort(function (x, y) { return x - y; }).join(",");
+          if (!seen[key]) { seen[key] = true; out.push(key.split(",").map(Number)); }
+        });
+      });
+    });
+    return out;
+  }
+
+  function hitRateFormation(combos, ordered) {
+    if (!combos.length) return 0;
+    var keys = {};
+    combos.forEach(function (c) {
+      var k = ordered ? c.join(",") : c.slice().sort(function (x, y) { return x - y; }).join(",");
+      keys[k] = true;
+    });
+    var hit = 0;
+    for (var i = 0; i < samples.length; i++) {
+      var a = samples[i].a;
+      var key = ordered ? a.join(",") : a.slice().sort(function (x, y) { return x - y; }).join(",");
+      if (keys[key]) hit++;
+    }
+    return hit / NS;
   }
 
   function initChecker() {
@@ -99,11 +128,30 @@
     var ptsOut = document.getElementById("bcPoints");
     var oddsIn = document.getElementById("bcOdds");
     var evOut = document.getElementById("bcEV");
-    var axisWrap = document.createElement("label");
-    axisWrap.className = "bc-axis";
-    axisWrap.style.display = "none";
-    axisWrap.innerHTML = "軸馬 <select id='bcAxis'></select>";
-    typeSel.parentNode.parentNode.insertBefore(axisWrap, horsesBox);
+
+    var formationBox = document.createElement("div");
+    formationBox.className = "bc-formation";
+    formationBox.style.display = "none";
+    horsesBox.parentNode.insertBefore(formationBox, horsesBox.nextSibling);
+    var groupLabels = ["1着候補", "2着候補", "3着候補"];
+    var groups = groupLabels.map(function (label, gi) {
+      var wrap = document.createElement("div");
+      wrap.className = "bc-fgroup";
+      var h = document.createElement("h4");
+      h.textContent = label;
+      wrap.appendChild(h);
+      var list = document.createElement("div");
+      list.className = "bc-horses";
+      sortedNums.forEach(function (n) {
+        var l = document.createElement("label");
+        l.className = "bc-chk";
+        l.innerHTML = "<input type='checkbox' data-g='" + gi + "' value='" + n + "'> " + n + "." + (nameByNum[n] || "");
+        list.appendChild(l);
+      });
+      wrap.appendChild(list);
+      formationBox.appendChild(wrap);
+      return list;
+    });
 
     sortedNums.forEach(function (n) {
       var l = document.createElement("label");
@@ -111,30 +159,44 @@
       l.innerHTML = "<input type='checkbox' value='" + n + "'> " + n + "." + (nameByNum[n] || "");
       horsesBox.appendChild(l);
     });
-    var axisSel = axisWrap.querySelector("#bcAxis");
-    sortedNums.forEach(function (n) {
-      var o = document.createElement("option");
-      o.value = n; o.textContent = n + "." + (nameByNum[n] || "");
-      axisSel.appendChild(o);
-    });
+
+    function groupPicks(gi) {
+      return Array.prototype.slice.call(groups[gi].querySelectorAll("input:checked"))
+        .map(function (c) { return Number(c.value); });
+    }
 
     function recompute() {
       var type = typeSel.value;
       var spec = TYPES[type];
       hint.textContent = spec.label;
-      axisWrap.style.display = spec.axis ? "" : "none";
-      var picks = Array.prototype.slice.call(horsesBox.querySelectorAll("input:checked"))
-        .map(function (c) { return Number(c.value); });
-      var axis = spec.axis ? Number(axisSel.value) : null;
-      if (spec.axis && axis != null && picks.indexOf(axis) === -1) picks.push(axis);
+      var pr, pts;
 
-      if (picks.length < spec.pick[0] || picks.length > spec.pick[1]) {
-        probOut.textContent = "—"; ptsOut.textContent = "—";
-        evOut.textContent = "—"; evOut.className = "muted";
-        return;
+      if (spec.kind === "formation") {
+        horsesBox.style.display = "none";
+        formationBox.style.display = "";
+        var g1 = groupPicks(0), g2 = groupPicks(1), g3 = groupPicks(2);
+        var combos = formationCombos(g1, g2, g3, spec.ordered);
+        if (!combos.length) {
+          probOut.textContent = "—"; ptsOut.textContent = "—";
+          evOut.textContent = "—"; evOut.className = "muted";
+          return;
+        }
+        pr = hitRateFormation(combos, spec.ordered);
+        pts = combos.length;
+      } else {
+        horsesBox.style.display = "";
+        formationBox.style.display = "none";
+        var picks = Array.prototype.slice.call(horsesBox.querySelectorAll("input:checked"))
+          .map(function (c) { return Number(c.value); });
+        if (picks.length < spec.pick[0] || picks.length > spec.pick[1]) {
+          probOut.textContent = "—"; ptsOut.textContent = "—";
+          evOut.textContent = "—"; evOut.className = "muted";
+          return;
+        }
+        pr = hitRateFlat(type, picks);
+        pts = pointsFlat(type, picks.length);
       }
-      var pr = hitRate(type, picks, axis);
-      var pts = points(type, picks.length, axis);
+
       probOut.textContent = (pr * 100).toFixed(1) + "%";
       ptsOut.textContent = pts + "点";
       var odds = parseFloat(oddsIn.value);
@@ -147,8 +209,8 @@
 
     typeSel.addEventListener("change", recompute);
     oddsIn.addEventListener("input", recompute);
-    axisSel.addEventListener("change", recompute);
     horsesBox.addEventListener("change", recompute);
+    formationBox.addEventListener("change", recompute);
     recompute();
   }
 

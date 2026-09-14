@@ -94,7 +94,10 @@ table{border-collapse:collapse;width:100%;font-size:.87rem}
 #betChecker select{padding:3px 6px}
 .bc-horses{display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 0}
 .bc-chk{font-size:.85rem;white-space:nowrap}
-.bc-axis{font-size:.9rem}
+.bc-formation{display:flex;flex-wrap:wrap;gap:18px;margin:8px 0}
+.bc-fgroup{min-width:150px}
+.bc-fgroup h4{margin:0 0 4px;font-size:.82rem;color:var(--muted);font-weight:600}
+.bc-fgroup .bc-horses{gap:4px 10px;margin:0}
 
 .site-footer{margin:40px auto 24px;color:var(--muted);font-size:.8rem}
 .site-footer .disclaimer{border-top:1px solid var(--line);padding-top:8px}

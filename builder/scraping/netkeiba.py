@@ -350,8 +350,8 @@ def _fetch_horse_history(
 
 
 # ---------------------------------------------------------------- results (過去レース)
-def fetch_race_result(race_id: str) -> Race:
-    html = get_client().get_text(RESULT_URL.format(race_id=race_id), TTL_RESULT)
+def fetch_race_result(race_id: str, *, use_cache: bool = True) -> Race:
+    html = get_client().get_text(RESULT_URL.format(race_id=race_id), TTL_RESULT, use_cache=use_cache)
     soup = BeautifulSoup(html, "lxml")
 
     race = Race(
@@ -416,6 +416,9 @@ def fetch_race_result(race_id: str) -> Race:
                 body_weight=_int(bw_txt.split("(")[0]) if bw_txt else None,
                 scratched=pos_txt in ("中止", "取消", "除外", "-", None),
                 result_finish_pos=_int(pos_txt),
+                # 確定単勝オッズ・人気 (レース終了後に確定した値のみ。事前のリアルタイム取得はしない)
+                result_odds=_num(g(cells, "単勝")),
+                result_popularity=_int(g(cells, "人気")),
             )
         )
     race.field_size = len(race.entries)
@@ -430,9 +433,9 @@ _PAY_KEYS = {
 }
 
 
-def fetch_payouts(race_id: str) -> dict:
+def fetch_payouts(race_id: str, *, use_cache: bool = True) -> dict:
     """確定した払戻を返す。 {kind: [{"combo": [nums], "yen": int, "pop": int}, ...]}"""
-    html = get_client().get_text(RESULT_URL.format(race_id=race_id), TTL_RESULT)
+    html = get_client().get_text(RESULT_URL.format(race_id=race_id), TTL_RESULT, use_cache=use_cache)
     soup = BeautifulSoup(html, "lxml")
     out: dict[str, list] = {}
     for tr in soup.select("table.pay_table_01 tr, table.Payout_Detail_Table tr"):

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>レース予測 — 競馬シミュレーター</title>
-  <link rel="stylesheet" href="/assets/app.css?v=e21f2d72">
+  <link rel="stylesheet" href="/assets/app.css?v=5321f886">
 </head>
 <body>
 <header class="site-header">
@@ -27,10 +27,12 @@
 <section class="card roi">
   <h2>推奨買い目の成績</h2>
   <p class="muted">
-    アプリが推奨した買い目（単勝・3連複・3連単）を、毎レース 1 点 100 円で購入したと
-    仮定した実績（運用開始 2026-09-08 以降）。3連複・3連単は軸のはっきり度で
-    「流し」か「フォーメーション」を都度選び、点数ぶん購入します。
-  </p>
+    成績に反映するのは <b>注目レース TOP3</b>（発走前の最終更新時点で自信度が高かったレース）
+    のうち、<b>軸馬（単勝）の確定オッズでの期待値がプラス</b>と判定できたレースのみです。
+    見送ったレースは成績に含めません。対象レースは推奨した買い目（単勝・3連複・3連単）を
+    毎レース 1 点 100 円で購入したと仮定した実績（運用開始 2026-09-08 以降）。
+    3連複・3連単は軸のはっきり度で「流し」か「フォーメーション」を都度選び、点数ぶん購入します。
+これまでに 48 レースを対象外（注目レース外／期待値マイナス）として見送りました。  </p>
 
   <h3>全体（0R・的中 0R）</h3>
   <div class="roi-headline">
@@ -118,26 +120,26 @@
     「はっきり度」は 高／中／低 の目安で、勝率・複勝率とは別の指標です。
   </p>
   <div class="attention-grid">
-    <a class="pick-card rank-1" href="/races/202609040709.html">
+    <a class="pick-card rank-1" href="/races/202606040710.html">
       <div class="pick-rank">No.1</div>
+      <div class="pick-title">中山10R ディープインパクトC</div>
+      <div class="pick-meta">2026-09-21 ／ 芝1600m ／ 14:50</div>
+      <table class="pick-stats">
+        <tr><th>軸</th><td>8. デイトナチャンプ</td></tr>
+        <tr><th>推定勝率</th><td>50.6%（適正2.0倍）</td></tr>
+        <tr><th>複勝率</th><td>89.7%</td></tr>
+        <tr><th>はっきり度</th><td>高</td></tr>
+      </table>
+    </a>
+    <a class="pick-card rank-2" href="/races/202609040709.html">
+      <div class="pick-rank">No.2</div>
       <div class="pick-title">阪神9R 新涼特別</div>
       <div class="pick-meta">2026-09-21 ／ ダ1400m ／ 14:25</div>
       <table class="pick-stats">
         <tr><th>軸</th><td>12. ピカラ</td></tr>
-        <tr><th>推定勝率</th><td>47.4%（適正2.1倍）</td></tr>
-        <tr><th>複勝率</th><td>83.7%</td></tr>
+        <tr><th>推定勝率</th><td>48.3%（適正2.1倍）</td></tr>
+        <tr><th>複勝率</th><td>85.3%</td></tr>
         <tr><th>はっきり度</th><td>高</td></tr>
-      </table>
-    </a>
-    <a class="pick-card rank-2" href="/races/202609040711.html">
-      <div class="pick-rank">No.2</div>
-      <div class="pick-title">阪神11R 神戸新聞杯</div>
-      <div class="pick-meta">2026-09-21 ／ 芝2400m ／ 15:45</div>
-      <table class="pick-stats">
-        <tr><th>軸</th><td>14. ロブチェン</td></tr>
-        <tr><th>推定勝率</th><td>34.9%（適正2.9倍）</td></tr>
-        <tr><th>複勝率</th><td>64.8%</td></tr>
-        <tr><th>はっきり度</th><td>中</td></tr>
       </table>
     </a>
     <a class="pick-card rank-3" href="/races/202606040509.html">
@@ -146,9 +148,9 @@
       <div class="pick-meta">2026-09-19 ／ 芝1200m ／ 14:25</div>
       <table class="pick-stats">
         <tr><th>軸</th><td>1. ジオパークカツキ</td></tr>
-        <tr><th>推定勝率</th><td>32.9%（適正3.0倍）</td></tr>
-        <tr><th>複勝率</th><td>57.0%</td></tr>
-        <tr><th>はっきり度</th><td>中</td></tr>
+        <tr><th>推定勝率</th><td>37.7%（適正2.7倍）</td></tr>
+        <tr><th>複勝率</th><td>61.6%</td></tr>
+        <tr><th>はっきり度</th><td>高</td></tr>
       </table>
     </a>
   </div>
@@ -174,19 +176,19 @@
         <td>芝1200m</td>
         <td>14:25</td>
         <td>1. ジオパークカツキ</td>
-        <td><b>32.9%</b></td>
-        <td>3.0倍</td>
-        <td>中</td>
+        <td><b>37.7%</b></td>
+        <td>2.7倍</td>
+        <td>高</td>
       </tr>
       <tr onclick="location.href='/races/202606040510.html'">
         <td>10</td>
         <td class="rname">九十九里特別</td>
         <td>芝2500m</td>
         <td>15:05</td>
-        <td>1. アロンズロッド</td>
-        <td><b>31.7%</b></td>
-        <td>3.2倍</td>
-        <td>中</td>
+        <td>7. トリニティ</td>
+        <td><b>20.0%</b></td>
+        <td>5.0倍</td>
+        <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202606040511.html'">
         <td>11</td>
@@ -194,8 +196,8 @@
         <td>ダ1800m</td>
         <td>15:45</td>
         <td>16. モンブランミノル</td>
-        <td><b>24.6%</b></td>
-        <td>4.1倍</td>
+        <td><b>26.6%</b></td>
+        <td>3.8倍</td>
         <td>中</td>
       </tr>
     </tbody>
@@ -215,9 +217,9 @@
         <td class="rname">阪神JS</td>
         <td>障3140m</td>
         <td>11:20</td>
-        <td>4. オオキニ</td>
-        <td><b>17.7%</b></td>
-        <td>5.6倍</td>
+        <td>6. ジューンベロシティ</td>
+        <td><b>21.4%</b></td>
+        <td>4.7倍</td>
         <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202609040509.html'">
@@ -225,10 +227,10 @@
         <td class="rname">野路菊S</td>
         <td>芝1600m</td>
         <td>14:10</td>
-        <td>9. メイショウセイクウ</td>
-        <td><b>26.7%</b></td>
-        <td>3.7倍</td>
-        <td>中</td>
+        <td>2. シティオブドリーム</td>
+        <td><b>21.7%</b></td>
+        <td>4.6倍</td>
+        <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202609040510.html'">
         <td>10</td>
@@ -236,18 +238,18 @@
         <td>芝1200m</td>
         <td>14:50</td>
         <td>17. リヴァイ</td>
-        <td><b>22.1%</b></td>
-        <td>4.5倍</td>
-        <td>低</td>
+        <td><b>28.0%</b></td>
+        <td>3.6倍</td>
+        <td>中</td>
       </tr>
       <tr onclick="location.href='/races/202609040511.html'">
         <td>11</td>
         <td class="rname">大阪スポーツ杯</td>
         <td>ダ1400m</td>
         <td>15:30</td>
-        <td>16. リサシテーション</td>
-        <td><b>24.7%</b></td>
-        <td>4.0倍</td>
+        <td>1. エブリーポッシブル</td>
+        <td><b>26.8%</b></td>
+        <td>3.7倍</td>
         <td>中</td>
       </tr>
     </tbody>
@@ -267,9 +269,9 @@
         <td class="rname">松戸特別</td>
         <td>ダ2400m</td>
         <td>14:25</td>
-        <td>5. コズミックダンサー</td>
-        <td><b>24.9%</b></td>
-        <td>4.0倍</td>
+        <td>15. マッドゲイル</td>
+        <td><b>23.9%</b></td>
+        <td>4.2倍</td>
         <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202606040610.html'">
@@ -277,10 +279,10 @@
         <td class="rname">汐留特別</td>
         <td>ダ1200m</td>
         <td>15:05</td>
-        <td>8. タカスタカスタカス</td>
-        <td><b>22.1%</b></td>
-        <td>4.5倍</td>
-        <td>中</td>
+        <td>11. フィールマイプラン</td>
+        <td><b>18.4%</b></td>
+        <td>5.4倍</td>
+        <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202606040611.html'">
         <td>11</td>
@@ -288,8 +290,8 @@
         <td>芝2200m</td>
         <td>15:45</td>
         <td>3. エセルフリーダ</td>
-        <td><b>26.0%</b></td>
-        <td>3.8倍</td>
+        <td><b>24.4%</b></td>
+        <td>4.1倍</td>
         <td>中</td>
       </tr>
     </tbody>
@@ -309,9 +311,9 @@
         <td class="rname">夕月特別</td>
         <td>芝2000m</td>
         <td>14:10</td>
-        <td>8. セナスタイル</td>
-        <td><b>19.5%</b></td>
-        <td>5.1倍</td>
+        <td>6. ジェルブロア</td>
+        <td><b>19.4%</b></td>
+        <td>5.2倍</td>
         <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202609040610.html'">
@@ -320,8 +322,8 @@
         <td>ダ1800m</td>
         <td>14:50</td>
         <td>9. ゼンエスポワール</td>
-        <td><b>19.7%</b></td>
-        <td>5.1倍</td>
+        <td><b>16.4%</b></td>
+        <td>6.1倍</td>
         <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202609040611.html'">
@@ -329,9 +331,9 @@
         <td class="rname">道頓堀S</td>
         <td>芝1200m</td>
         <td>15:30</td>
-        <td>17. モーデン</td>
-        <td><b>24.2%</b></td>
-        <td>4.1倍</td>
+        <td>11. ハンデンドレイク</td>
+        <td><b>28.6%</b></td>
+        <td>3.5倍</td>
         <td>中</td>
       </tr>
     </tbody>
@@ -352,8 +354,8 @@
         <td>ダ1800m</td>
         <td>14:10</td>
         <td>11. サファイアテソーロ</td>
-        <td><b>25.5%</b></td>
-        <td>3.9倍</td>
+        <td><b>22.8%</b></td>
+        <td>4.4倍</td>
         <td>中</td>
       </tr>
       <tr onclick="location.href='/races/202606040710.html'">
@@ -362,9 +364,9 @@
         <td>芝1600m</td>
         <td>14:50</td>
         <td>8. デイトナチャンプ</td>
-        <td><b>28.8%</b></td>
-        <td>3.5倍</td>
-        <td>中</td>
+        <td><b>50.6%</b></td>
+        <td>2.0倍</td>
+        <td>高</td>
       </tr>
       <tr onclick="location.href='/races/202606040711.html'">
         <td>11</td>
@@ -372,8 +374,8 @@
         <td>ダ1800m</td>
         <td>15:30</td>
         <td>20. リフレックス</td>
-        <td><b>19.3%</b></td>
-        <td>5.2倍</td>
+        <td><b>18.4%</b></td>
+        <td>5.4倍</td>
         <td>低</td>
       </tr>
     </tbody>
@@ -394,7 +396,7 @@
         <td>ダ1400m</td>
         <td>14:25</td>
         <td>12. ピカラ</td>
-        <td><b>47.4%</b></td>
+        <td><b>48.3%</b></td>
         <td>2.1倍</td>
         <td>高</td>
       </tr>
@@ -403,9 +405,9 @@
         <td class="rname">キタサンブラックC</td>
         <td>芝2200m</td>
         <td>15:05</td>
-        <td>14. ベトルス</td>
-        <td><b>19.6%</b></td>
-        <td>5.1倍</td>
+        <td>12. ナリタエスペランサ</td>
+        <td><b>19.3%</b></td>
+        <td>5.2倍</td>
         <td>低</td>
       </tr>
       <tr onclick="location.href='/races/202609040711.html'">
@@ -414,8 +416,8 @@
         <td>芝2400m</td>
         <td>15:45</td>
         <td>14. ロブチェン</td>
-        <td><b>34.9%</b></td>
-        <td>2.9倍</td>
+        <td><b>29.2%</b></td>
+        <td>3.4倍</td>
         <td>中</td>
       </tr>
     </tbody>
@@ -427,8 +429,8 @@
 
 <footer class="site-footer wrap">
   <p>
-    データ生成: 2026-09-14 09:47 UTC ／ 対象: 2026-09-19 ・ 2026-09-20 ・ 2026-09-21
-      ／ 学習済みレース数: 287
+    データ生成: 2026-09-14 12:17 UTC ／ 対象: 2026-09-19 ・ 2026-09-20 ・ 2026-09-21
+      ／ 学習済みレース数: 365
   </p>
   <p class="disclaimer">
     本アプリは過去データに基づく統計的シミュレーションであり、的中を保証しません。

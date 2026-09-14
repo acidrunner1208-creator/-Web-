@@ -122,7 +122,8 @@
   <h2>買い目チェッカー（オッズ公開後）</h2>
   <p class="muted">
     買いたい馬番にチェックを入れ、買い方を選ぶと、その買い目の推定的中率を計算します
-    （{{ r.podium_n }}回のシミュレーション着順サンプルに基づく）。netkeiba でオッズを見て実オッズを入れると期待値も出ます。
+    （{{ r.podium_n }}回のシミュレーション着順サンプルに基づく）。3連複・3連単はフォーメーションのみに対応しており、
+    1〜3着それぞれの候補馬を選ぶと組合せを自動生成します。netkeiba でオッズを見て実オッズを入れると期待値も出ます。
   </p>
   <div id="betChecker">
     <div class="bc-row">
@@ -133,9 +134,8 @@
           <option value="umaren">馬連</option>
           <option value="wide">ワイド</option>
           <option value="umatan">馬単</option>
-          <option value="sanrenpuku">3連複（ボックス）</option>
-          <option value="sanrenpuku_nagashi">3連複 軸1頭ながし</option>
-          <option value="sanrentan">3連単（1着→2着→3着 指定）</option>
+          <option value="sanrenpuku">3連複（フォーメーション）</option>
+          <option value="sanrentan">3連単（フォーメーション）</option>
         </select>
       </label>
       <span id="bcHint" class="muted"></span>

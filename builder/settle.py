@@ -2,10 +2,14 @@
 
     python -m builder.settle
 
-- `public/data/recommended/*.json` のうち、まだ清算していない過去レースを処理
-- 単勝／3連複フォーメーション／3連複軸1頭ながし を各100円単位で購入したと仮定し、
-  実際の払戻から損益を計算して `public/data/ledger.json` を更新
-- 清算できたレースは学習モデルに逐次反映 (`builder.model.update`)
+- `public/data/recommended/*.json` のうち、まだ処理していない過去レースを処理
+- 結果が取得できたレースは (成績に載せるかに関わらず) すべて学習モデルに逐次反映
+  (`builder.model.update`)
+- 成績 (ledger.entries) に反映するのは (1) その日の注目レース TOP3 だったレースのみ・
+  かつ (2) 軸馬(単勝)の確定オッズでの期待値がプラスと判定できたレースのみ。
+  それ以外は「除外」として `ledger.excluded` に理由つきで記録し、損益には含めない
+- 対象レースは単勝／3連複／3連単 を各100円単位で購入したと仮定し、実際の払戻から
+  損益を計算して `public/data/ledger.json` を更新
 """
 from __future__ import annotations
 
@@ -38,6 +42,26 @@ def _actual_top3(race) -> list[int]:
         key=lambda e: e.result_finish_pos,
     )
     return [e.horse_number for e in finishers[:3] if e.horse_number]
+
+
+def _axis_final_ev(rec: dict, race) -> tuple[float | None, float | None]:
+    """軸馬(単勝)の確定オッズと、そのオッズでの期待値 (的中率×オッズ−1) を返す。
+
+    3連複・3連単の個々の組合せの確定オッズはレース後には取得できないため、
+    レース全体を「買うか見送るか」の判定には単勝の確定オッズを用いる
+    (＝アプリが最終的に推した軸馬が、市場の最終オッズでも妙味があったか)。
+    取得できない場合は (None, None)。
+    """
+    tansho = next((b for b in rec.get("recommended", []) if b.get("key") == "tansho"), None)
+    if not tansho or tansho.get("hit_prob") is None:
+        return None, None
+    axis = (tansho.get("axis") or tansho.get("nums") or [None])[0]
+    if axis is None:
+        return None, None
+    entry = next((e for e in race.entries if e.horse_number == axis), None)
+    if entry is None or entry.result_odds is None:
+        return None, None
+    return entry.result_odds, tansho["hit_prob"] * entry.result_odds - 1.0
 
 
 def _settle_bet(bet: dict, top3: list[int], payouts: dict) -> dict:
@@ -90,14 +114,21 @@ def settle(out_dir: Path | None = None) -> dict:
     out_dir = out_dir or get_settings().out_path
     rec_dir = out_dir / "data" / "recommended"
     ledger_path = out_dir / "data" / "ledger.json"
-    ledger = _load_json(ledger_path, {"entries": []})
-    settled_ids = {e["race_id"] for e in ledger["entries"]}
+    ledger = _load_json(ledger_path, {"entries": [], "excluded": []})
+    excluded = ledger.get("excluded", [])
+    excluded_ids = {x["race_id"] for x in excluded}
+    processed_ids = {e["race_id"] for e in ledger["entries"]} | excluded_ids
     today = date.today()
 
-    new_entries, model_ids = [], []
+    # モデルの学習データは注目レース以外も含めて全レースぶん取り込む
+    # (成績=ledger に載せるかどうかとは別の話)。ledger に載せるのは
+    # 「注目レース TOP3」かつ「軸馬の確定オッズでの期待値がプラス」の
+    # レースのみ。
+    new_entries, new_excluded, model_ids = [], [], []
+    candidates = 0
     for f in sorted(rec_dir.glob("*.json")) if rec_dir.exists() else []:
         rec = _load_json(f, None)
-        if not rec or rec["race_id"] in settled_ids:
+        if not rec or rec["race_id"] in processed_ids:
             continue
         try:
             rdate = date.fromisoformat(rec["kaisai_date"])
@@ -105,16 +136,44 @@ def settle(out_dir: Path | None = None) -> dict:
             continue
         if rdate > today:
             continue
+        candidates += 1
         try:
             race = fetch_race_result(rec["race_id"])
             top3 = _actual_top3(race)
             if len(top3) < 3:
+                # キャッシュされた不完全なページの可能性があるのでキャッシュを
+                # 無視して1度だけ取り直す (自己修復)。
+                race = fetch_race_result(rec["race_id"], use_cache=False)
+                top3 = _actual_top3(race)
+            if len(top3) < 3:
+                log.warning("result %s: 着順3頭未満 (entries=%d)", rec["race_id"], len(race.entries))
                 continue
             payouts = fetch_payouts(rec["race_id"])
+            if not payouts:
+                payouts = fetch_payouts(rec["race_id"], use_cache=False)
         except Exception as exc:  # noqa: BLE001
-            log.warning("result %s: %s", rec["race_id"], exc)
+            log.warning("result %s: %s: %s", rec["race_id"], type(exc).__name__, exc)
             continue
         if not payouts:
+            log.warning("result %s: 払戻が取得できませんでした", rec["race_id"])
+            continue
+
+        # 結果が取れたレースは (成績に載るかに関わらず) モデルの学習対象にする。
+        model_ids.append(rec["race_id"])
+
+        # 注目レース (その日の自信度 TOP3、最終更新時点) でなければ成績には載せない。
+        # 古い形式 (attention キーが無い) は判定できないため対象外扱い。
+        if not rec.get("attention"):
+            new_excluded.append({"race_id": rec["race_id"], "reason": "not_attention"})
+            continue
+
+        final_odds, ev = _axis_final_ev(rec, race)
+        if ev is None or ev <= 0:
+            log.info("見送り %s %s: 軸馬の最終オッズでの期待値がマイナス (odds=%s, ev=%s)",
+                      rec["race_id"], rec.get("race_name", ""), final_odds,
+                      None if ev is None else round(ev, 3))
+            new_excluded.append({"race_id": rec["race_id"], "reason": "negative_ev",
+                                  "final_odds": final_odds, "ev": None if ev is None else round(ev, 3)})
             continue
 
         bets = [_settle_bet(b, top3, payouts) for b in rec["recommended"]]
@@ -126,11 +185,10 @@ def settle(out_dir: Path | None = None) -> dict:
             "top3": top3, "bets": bets,
             "stake": stake, "ret": ret, "profit": ret - stake,
         })
-        model_ids.append(rec["race_id"])
         log.info("settled %s %s: stake=%d ret=%d profit=%+d",
                  rec["race_id"], rec.get("race_name", ""), stake, ret, ret - stake)
 
-    if new_entries:
+    if new_entries or new_excluded:
         alle = ledger["entries"] + new_entries
         alle.sort(key=lambda e: (e["date"], e["race_id"]))
         cum_s = cum_r = 0
@@ -148,6 +206,7 @@ def settle(out_dir: Path | None = None) -> dict:
                 "roi": round(cum_r / cum_s, 4) if cum_s else 0.0, "hit_races": hit,
             },
             "entries": alle,
+            "excluded": excluded + new_excluded,
         }
         ledger_path.parent.mkdir(parents=True, exist_ok=True)
         ledger_path.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
@@ -161,7 +220,13 @@ def settle(out_dir: Path | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.warning("model update failed: %s", exc)
 
-    return {"settled": len(new_entries), "model": updated}
+    not_attn = sum(1 for x in new_excluded if x["reason"] == "not_attention")
+    neg_ev = sum(1 for x in new_excluded if x["reason"] == "negative_ev")
+    log.info("完了: 結果取得%d件・学習%d件 / 成績反映=%d (注目レース対象外%d件・最終オッズ期待値マイナス%d件を除外)",
+              candidates, len(model_ids), len(new_entries), not_attn, neg_ev)
+    return {"settled": len(new_entries), "model": updated, "candidates": candidates,
+            "model_updates": len(model_ids), "excluded_not_attention": not_attn,
+            "excluded_negative_ev": neg_ev}
 
 
 def main() -> None:

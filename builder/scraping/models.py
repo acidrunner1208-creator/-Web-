@@ -53,6 +53,8 @@ class Entry(BaseModel):
     dam_sire: str | None = None
     scratched: bool = False
     result_finish_pos: int | None = None
+    result_odds: float | None = None       # 確定単勝オッズ (レース結果ページより。事前のリアルタイム取得はしない)
+    result_popularity: int | None = None   # 確定人気順
     past_runs: list[PastRun] = Field(default_factory=list)
 
     @property
